@@ -1,0 +1,6 @@
+{
+  "name": "PapayaOS.ai",
+  "description": "PapayaOS.ai – Next-Gen Sovereign Workspace & Multi-Agent Intelligence Suite. Gmail AI Inbox, Veo Video Studio, Social Media Engine & Chronos Calendar.",
+  "requestFramePermissions": ["microphone", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

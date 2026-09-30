@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Liquid Jelly Nav</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#050506}
+body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eeeeef}
+.stage{position:relative;isolation:isolate;display:grid;min-height:100vh;place-items:center;overflow:hidden;padding:24px;
+  background:linear-gradient(rgba(255,255,255,.038) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.038) 1px,transparent 1px),
+  radial-gradient(circle at 50% 38%,#111315 0%,#08090a 45%,#050506 100%);background-size:112px 112px,112px 112px,100% 100%}
+.stage::before{position:absolute;z-index:-2;inset:0;content:"";background:linear-gradient(180deg,rgba(255,255,255,.025),transparent 30%),
+  radial-gradient(circle at 49% 48%,transparent 0%,rgba(0,0,0,.26) 64%,rgba(0,0,0,.72) 100%);pointer-events:none}
+.ambient{position:absolute;z-index:-1;width:380px;height:380px;border-radius:50%;background:rgba(29,108,255,.055);filter:blur(110px);pointer-events:none}
+.ambient.one{top:-210px;left:18%}.ambient.two{right:8%;bottom:-240px;opacity:.55}
+.bar{position:relative;display:flex;width:min(1040px,calc(100vw - 48px));min-height:158px;align-items:center;gap:28px;overflow:hidden;
+  padding:25px 31px 25px 38px;border:1px solid rgba(255,255,255,.085);border-radius:999px;
+  background:linear-gradient(180deg,rgba(25,26,27,.96),rgba(9,10,11,.985));
+  box-shadow:0 35px 80px rgba(0,0,0,.64),0 12px 26px rgba(0,0,0,.56),inset 0 1px 0 rgba(255,255,255,.075),inset 0 -1px 0 rgba(0,0,0,.92),inset 20px 0 35px rgba(255,255,255,.012)}
+.orb-wrap{position:relative;z-index:2;flex:0 0 108px;width:108px;height:108px}
+.orb{position:relative;isolation:isolate;width:100%;height:100%;border-radius:50%;
+  filter:drop-shadow(0 0 3px rgba(164,235,255,.95)) drop-shadow(0 0 10px rgba(66,177,255,.82)) drop-shadow(0 0 24px rgba(21,91,255,.62))}
+.orb::before,.orb::after{position:absolute;border-radius:50%;content:"";pointer-events:none}
+.orb::before{z-index:0;inset:5%;background:radial-gradient(circle,rgba(86,210,255,.72) 0%,rgba(25,105,255,.5) 42%,rgba(5,47,180,.12) 70%,transparent 78%);
+  filter:blur(11px);opacity:.82;animation:bloom 3.4s ease-in-out infinite}
+.orb::after{z-index:3;inset:2%;border:1px solid rgba(156,232,255,.28);
+  box-shadow:0 0 7px rgba(168,237,255,.42),0 0 18px rgba(46,147,255,.34),inset 0 0 11px rgba(108,213,255,.16);opacity:.72;animation:rim 2.8s ease-in-out infinite}
+.orb canvas{position:relative;z-index:2;display:block;width:100%!important;height:100%!important;border-radius:50%}
+.orb-glow{position:absolute;z-index:0;inset:12%;border-radius:50%;
+  background:radial-gradient(circle,rgba(98,221,255,.88) 0%,rgba(18,104,255,.65) 44%,rgba(18,76,235,.08) 74%,transparent 80%);
+  opacity:.56;filter:blur(16px);animation:breathe 3.4s ease-in-out infinite}
+.rail{position:relative;z-index:2;display:flex;min-width:0;align-items:center;gap:14px;overflow:hidden;padding:3px 2px;scrollbar-width:none}
+.rail::-webkit-scrollbar{display:none}
+.item{position:relative;display:inline-flex;min-width:max-content;height:82px;align-items:center;justify-content:center;gap:15px;overflow:hidden;
+  padding:0 36px;border:1px solid rgba(255,255,255,.047);border-radius:999px;outline:none;color:rgba(226,226,228,.68);
+  background:linear-gradient(180deg,rgba(27,28,29,.53),rgba(15,16,17,.35));box-shadow:inset 0 1px 0 rgba(255,255,255,.024),0 10px 22px rgba(0,0,0,.18);
+  cursor:pointer;transition:color .45s cubic-bezier(.16,1,.3,1),border-color .45s cubic-bezier(.16,1,.3,1),background .45s cubic-bezier(.16,1,.3,1),
+  transform .45s cubic-bezier(.16,1,.3,1),box-shadow .45s cubic-bezier(.16,1,.3,1);-webkit-tap-highlight-color:transparent;font:inherit;background-color:transparent}
+.item:first-child{min-width:214px}
+.item svg{z-index:1;flex:0 0 auto;width:31px;height:31px;transition:transform .45s cubic-bezier(.16,1,.3,1),filter .45s cubic-bezier(.16,1,.3,1)}
+.item>span{z-index:1;font-size:clamp(20px,2.15vw,30px);font-weight:400;letter-spacing:-.035em;white-space:nowrap}
+.shine{position:absolute;top:-120%;left:-45%;width:42%;height:340%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.075),transparent);
+  opacity:0;pointer-events:none;transform:rotate(16deg);transition:left .72s cubic-bezier(.16,1,.3,1),opacity .25s ease}
+.item:hover{border-color:rgba(255,255,255,.09);color:rgba(250,250,251,.92);
+  background:linear-gradient(180deg,rgba(33,34,36,.7),rgba(17,18,20,.58));box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 14px 30px rgba(0,0,0,.25);transform:translateY(-2px)}
+.item:hover .shine{left:108%;opacity:1}
+.item:hover svg{transform:scale(1.04)}
+.item.active{border-color:rgba(255,255,255,.068);color:rgba(245,245,246,.84);
+  background:radial-gradient(circle at 50% -55%,rgba(255,255,255,.075),transparent 68%),linear-gradient(180deg,rgba(31,32,34,.66),rgba(15,16,17,.54))}
+.item.active svg{color:rgba(240,242,246,.87);filter:drop-shadow(0 0 8px rgba(178,211,255,.08))}
+.item:focus-visible{border-color:rgba(91,175,255,.65);box-shadow:0 0 0 4px rgba(31,112,255,.17)}
+@keyframes breathe{0%,100%{opacity:.26;transform:scale(.9)}50%{opacity:.48;transform:scale(1.08)}}
+@keyframes bloom{0%,100%{opacity:.64;transform:scale(.96)}50%{opacity:.94;transform:scale(1.12)}}
+@keyframes rim{0%,100%{opacity:.58;transform:scale(.99)}50%{opacity:.9;transform:scale(1.025)}}
+@media (max-width:1080px){
+  .bar{width:min(980px,calc(100vw - 36px));min-height:132px;gap:20px;padding:19px 24px 19px 28px}
+  .orb-wrap{flex-basis:94px;width:94px;height:94px}
+  .rail{flex:1;gap:12px}
+  .item,.item:first-child{min-width:0;width:auto;height:82px;flex:1 1 auto;gap:10px;padding:0 clamp(14px,2vw,26px)}
+  .item svg{width:26px;height:26px}
+  .item>span{display:inline;overflow:hidden;font-size:clamp(15px,1.7vw,19px);text-overflow:ellipsis}
+}
+@media (max-width:720px){
+  .stage{padding:14px;background-size:72px 72px,72px 72px,100% 100%}
+  .bar{width:calc(100vw - 28px);min-height:116px;gap:clamp(8px,3vw,16px);padding:16px clamp(12px,4vw,18px)}
+  .orb-wrap{flex-basis:clamp(62px,20vw,82px);width:clamp(62px,20vw,82px);height:clamp(62px,20vw,82px)}
+  .rail{flex:1;gap:clamp(4px,2vw,9px)}
+  .item,.item:first-child{min-width:0;width:auto;height:clamp(56px,17vw,72px);flex:1 1 0;gap:0;padding:0}
+  .item svg{width:28px;height:28px}
+  .item>span{display:none}
+}
+@media (prefers-reduced-motion:reduce){.orb-glow,.orb::before,.orb::after{animation:none}.item,.item svg,.shine{transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="ambient one"></div>
+  <div class="ambient two"></div>
+  <nav class="bar" aria-label="Primary navigation">
+    <div class="orb-wrap">
+      <div class="orb" aria-label="Interactive liquid energy orb">
+        <div class="orb-glow"></div>
+        <canvas id="orbCanvas"></canvas>
+      </div>
+    </div>
+    <div class="rail" id="rail"></div>
+  </nav>
+</main>
+<script>
+const ICONS = {
+  Home: '<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-5a1 1 0 0 1 1-1h0a1 1 0 0 1 1 1v5a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V10"/>',
+  Chart: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/>',
+  Layers: '<path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>'
+};
+const items = [
+  { label: 'Home', icon: 'Home' },
+  { label: 'Measure Advances', icon: 'Chart' },
+  { label: 'Collections', icon: 'Layers' }
+];
+const rail = document.getElementById('rail');
+let active = 'Home';
+function renderRail(){
+  rail.innerHTML = '';
+  items.forEach(({label, icon}) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'item' + (active === label ? ' active' : '');
+    if (active === label) btn.setAttribute('aria-current', 'page');
+    btn.innerHTML = `<span class="shine"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[icon]}</svg><span>${label}</span>`;
+    btn.addEventListener('click', () => { active = label; renderRail(); });
+    rail.appendChild(btn);
+  });
+}
+renderRail();
+
+/* ---------- Liquid orb (vanilla three.js port) ---------- */
+const noiseGLSL = `
+vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x,289.0);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+float snoise(vec3 v){
+  const vec2 C=vec2(1.0/6.0,1.0/3.0);const vec4 D=vec4(0.0,0.5,1.0,2.0);
+  vec3 i=floor(v+dot(v,C.yyy));vec3 x0=v-i+dot(i,C.xxx);
+  vec3 g=step(x0.yzx,x0.xyz);vec3 l=1.0-g;vec3 i1=min(g.xyz,l.zxy);vec3 i2=max(g.xyz,l.zxy);
+  vec3 x1=x0-i1+C.xxx;vec3 x2=x0-i2+C.yyy;vec3 x3=x0-D.yyy;
+  i=mod(i,289.0);
+  vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));
+  float n_=1.0/7.0;vec3 ns=n_*D.wyz-D.xzx;
+  vec4 j=p-49.0*floor(p*ns.z*ns.z);
+  vec4 x_=floor(j*ns.z);vec4 y_=floor(j-7.0*x_);
+  vec4 x=x_*ns.x+ns.yyyy;vec4 y=y_*ns.x+ns.yyyy;
+  vec4 h=1.0-abs(x)-abs(y);
+  vec4 b0=vec4(x.xy,y.xy);vec4 b1=vec4(x.zw,y.zw);
+  vec4 s0=floor(b0)*2.0+1.0;vec4 s1=floor(b1)*2.0+1.0;
+  vec4 sh=-step(h,vec4(0.0));
+  vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+  vec3 p0=vec3(a0.xy,h.x);vec3 p1=vec3(a0.zw,h.y);vec3 p2=vec3(a1.xy,h.z);vec3 p3=vec3(a1.zw,h.w);
+  vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+  p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+  vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0);m*=m;
+  return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+}
+float fbm(vec3 p){
+  float value=0.0;float amplitude=0.55;
+  mat3 rotation=mat3(0.00,0.80,0.60,-0.80,0.36,-0.48,-0.60,-0.48,0.64);
+  for(int i=0;i<4;i++){value+=amplitude*snoise(p);p=rotation*p*2.02+vec3(0.17,-0.11,0.13);amplitude*=0.5;}
+  return value;
+}`;
+
+const blobVertexShader = `
+uniform float uTime; uniform float uEnergy;
+varying vec3 vObjectPosition; varying vec3 vWorldPosition; varying vec3 vWorldNormal; varying float vNoise;
+${noiseGLSL}
+void main(){
+  vec3 p=position; float time=uTime*0.42; vec3 samplePoint=normalize(position)*2.35;
+  float broadNoise=snoise(samplePoint+vec3(time,-time*0.71,time*0.46));
+  float detailNoise=snoise(samplePoint*2.1+vec3(-time*0.82,time*0.55,-time*0.34));
+  float liquidNoise=broadNoise+detailNoise*0.42;
+  float ripple=sin(position.y*5.4-uTime*1.65+liquidNoise*2.8);
+  float displacement=liquidNoise*0.034+ripple*0.011;
+  p+=normal*displacement*(1.0+uEnergy*0.78);
+  vec4 world=modelMatrix*vec4(p,1.0);
+  vObjectPosition=p; vWorldPosition=world.xyz; vWorldNormal=normalize(mat3(modelMatrix)*normal); vNoise=liquidNoise;
+  gl_Position=projectionMatrix*viewMatrix*world;
+}`;
+
+const liquidFragmentShader = `
+uniform float uTime; uniform float uEnergy; uniform vec2 uPointer;
+varying vec3 vObjectPosition; varying vec3 vWorldPosition; varying vec3 vWorldNormal; varying float vNoise;
+${noiseGLSL}
+mat2 rotate2d(float angle){float s=sin(angle);float c=cos(angle);return mat2(c,-s,s,c);}
+void main(){
+  vec3 p=vObjectPosition*2.3; p.xz*=rotate2d(uTime*0.12); p.xy*=rotate2d(-uTime*0.08);
+  vec3 drift=vec3(uTime*0.13,-uTime*0.18,uTime*0.105);
+  float warpA=fbm(p*1.08+drift);
+  float warpB=fbm(p*1.72-drift*1.37+vec3(warpA*1.4));
+  float flow=fbm(p*2.35+vec3(warpA,warpB,-warpA)*1.75+drift*0.8);
+  float angle=atan(p.z,p.x);
+  float ribbonWave=sin(p.y*5.0+angle*2.25+warpA*4.2-uTime*1.35);
+  float ribbons=pow(max(0.0,1.0-abs(ribbonWave)),4.5);
+  float cells=smoothstep(0.08,0.72,flow+warpB*0.46);
+  float sparks=pow(max(0.0,flow*0.5+warpA*0.5+0.44),6.0);
+  vec3 normal=normalize(vWorldNormal); vec3 viewDirection=normalize(cameraPosition-vWorldPosition);
+  float facing=clamp(dot(normal,viewDirection),0.0,1.0); float fresnel=pow(1.0-facing,2.75);
+  vec3 deepBlue=vec3(0.005,0.035,0.14); vec3 electricBlue=vec3(0.015,0.28,1.0);
+  vec3 liquidCyan=vec3(0.10,0.78,1.0); vec3 iceWhite=vec3(0.72,0.94,1.0);
+  vec3 color=mix(deepBlue,electricBlue,cells);
+  color=mix(color,liquidCyan,ribbons*0.66);
+  color+=electricBlue*max(vNoise,0.0)*0.42;
+  color+=iceWhite*sparks*(0.6+uEnergy*0.65);
+  color+=mix(electricBlue,liquidCyan,facing)*fresnel*0.82;
+  float pointerGlow=max(0.0,dot(normalize(vObjectPosition),normalize(vec3(uPointer,0.72))));
+  pointerGlow=pow(pointerGlow,10.0);
+  color+=iceWhite*pointerGlow*(0.16+uEnergy*0.36);
+  color*=0.86+facing*0.28;
+  gl_FragColor=vec4(color,0.98);
+}`;
+
+const glassFragmentShader = `
+uniform float uTime; uniform float uEnergy;
+varying vec3 vObjectPosition; varying vec3 vWorldPosition; varying vec3 vWorldNormal; varying float vNoise;
+void main(){
+  vec3 normal=normalize(vWorldNormal); vec3 viewDirection=normalize(cameraPosition-vWorldPosition);
+  vec3 lightDirection=normalize(vec3(-0.55,0.82,0.95)); vec3 reflectedLight=reflect(-lightDirection,normal);
+  float facing=clamp(dot(normal,viewDirection),0.0,1.0); float fresnel=pow(1.0-facing,3.15);
+  float sharpHighlight=pow(max(dot(reflectedLight,viewDirection),0.0),86.0);
+  float broadHighlight=pow(max(dot(reflectedLight,viewDirection),0.0),13.0);
+  float lowerRim=pow(max(dot(normal,normalize(vec3(0.35,-0.75,0.52))),0.0),8.0);
+  vec3 blue=vec3(0.10,0.48,1.0); vec3 cyan=vec3(0.27,0.84,1.0); vec3 white=vec3(0.86,0.97,1.0);
+  vec3 color=blue*fresnel*1.18;
+  color+=cyan*broadHighlight*0.36;
+  color+=white*sharpHighlight*(1.4+uEnergy*0.55);
+  color+=blue*lowerRim*0.28;
+  color+=cyan*max(vNoise,0.0)*fresnel*0.16;
+  float alpha=0.035+fresnel*0.47;
+  alpha+=broadHighlight*0.10+sharpHighlight*0.74;
+  alpha+=lowerRim*0.08;
+  gl_FragColor=vec4(color,clamp(alpha,0.0,0.92));
+}`;
+
+(function initOrb(){
+  const canvas = document.getElementById('orbCanvas');
+  const wrap = canvas.parentElement;
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.12;
+  renderer.setClearColor(0x000000, 0);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 20);
+  camera.position.set(0, 0, 4.15);
+
+  const group = new THREE.Group();
+  scene.add(group);
+
+  const fluidUniforms = { uTime: { value: 0 }, uEnergy: { value: 0 }, uPointer: { value: new THREE.Vector2(0, 0) } };
+  const glassUniforms = { uTime: { value: 0 }, uEnergy: { value: 0 } };
+
+  const fluidMaterial = new THREE.ShaderMaterial({ uniforms: fluidUniforms, vertexShader: blobVertexShader, fragmentShader: liquidFragmentShader, transparent: true, depthWrite: true });
+  const glassMaterial = new THREE.ShaderMaterial({ uniforms: glassUniforms, vertexShader: blobVertexShader, fragmentShader: glassFragmentShader, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+
+  const sphereGeo = new THREE.SphereGeometry(1, 96, 96);
+
+  const fluidMesh = new THREE.Mesh(sphereGeo, fluidMaterial);
+  fluidMesh.scale.setScalar(0.955);
+  group.add(fluidMesh);
+
+  const ribbons = new THREE.Group();
+  ribbons.scale.setScalar(0.93);
+  const knotMat1 = new THREE.MeshBasicMaterial({ color: 0x40b8ff, transparent: true, opacity: 0.34, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
+  const knot1 = new THREE.Mesh(new THREE.TorusKnotGeometry(0.57, 0.012, 180, 7, 2, 3), knotMat1);
+  knot1.rotation.set(0.7, 0.25, 0.15);
+  ribbons.add(knot1);
+  const knotMat2 = new THREE.MeshBasicMaterial({ color: 0xa8efff, transparent: true, opacity: 0.24, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
+  const knot2 = new THREE.Mesh(new THREE.TorusKnotGeometry(0.56, 0.009, 160, 6, 3, 4), knotMat2);
+  knot2.rotation.set(-0.42, 0.78, -0.4);
+  knot2.scale.setScalar(0.82);
+  ribbons.add(knot2);
+  group.add(ribbons);
+
+  function seededRandom(i){ const v = Math.sin(i * 78.233 + 19.19) * 43758.5453; return v - Math.floor(v); }
+  const count = 92;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const radius = Math.cbrt(seededRandom(i * 3 + 1)) * 0.84;
+    const theta = seededRandom(i * 3 + 2) * Math.PI * 2;
+    const z = seededRandom(i * 3 + 3) * 2 - 1;
+    const ring = Math.sqrt(1 - z * z);
+    positions[i * 3] = radius * ring * Math.cos(theta);
+    positions[i * 3 + 1] = radius * z;
+    positions[i * 3 + 2] = radius * ring * Math.sin(theta);
+  }
+  const particleGeo = new THREE.BufferGeometry();
+  particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const particleMat = new THREE.PointsMaterial({ color: 0x8eeaff, size: 0.025, sizeAttenuation: true, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
+  const particles = new THREE.Points(particleGeo, particleMat);
+  group.add(particles);
+
+  const glassMesh = new THREE.Mesh(sphereGeo, glassMaterial);
+  glassMesh.scale.setScalar(1.035);
+  group.add(glassMesh);
+
+  const rimMat = new THREE.MeshBasicMaterial({ color: 0x65bdff, transparent: true, opacity: 0.055, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.BackSide, toneMapped: false });
+  const rimMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 64), rimMat);
+  rimMesh.scale.setScalar(1.062);
+  group.add(rimMesh);
+
+  let hovered = false;
+  let burst = 0;
+  const pointer = new THREE.Vector2(0, 0);
+  const raycaster = new THREE.Raycaster();
+
+  function resize(){
+    const w = wrap.clientWidth || 108, h = wrap.clientHeight || 108;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function updatePointer(clientX, clientY){
+    const rect = canvas.getBoundingClientRect();
+    pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  function hitTest(){
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects([fluidMesh, glassMesh]);
+    return hits.length > 0;
+  }
+
+  canvas.addEventListener('pointermove', (e) => {
+    updatePointer(e.clientX, e.clientY);
+    hovered = hitTest();
+    canvas.style.cursor = hovered ? 'pointer' : 'default';
+  });
+  canvas.addEventListener('pointerleave', () => { hovered = false; canvas.style.cursor = 'default'; });
+  canvas.addEventListener('pointerdown', (e) => {
+    updatePointer(e.clientX, e.clientY);
+    if (hitTest()) burst = 1.05;
+  });
+
+  const clock = new THREE.Clock();
+  let scale = 1;
+  function damp(current, target, lambda, dt){ return THREE.MathUtils.lerp(current, target, 1 - Math.exp(-lambda * dt)); }
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const elapsed = clock.elapsedTime;
+    const targetEnergy = hovered ? 0.62 : 0.14;
+    burst = Math.max(0, burst - dt * 1.55);
+    const energy = Math.min(1.25, targetEnergy + burst);
+
+    fluidUniforms.uTime.value = elapsed;
+    fluidUniforms.uEnergy.value = damp(fluidUniforms.uEnergy.value, energy, 5.2, dt);
+    fluidUniforms.uPointer.value.lerp(pointer, 0.065);
+
+    glassUniforms.uTime.value = elapsed;
+    glassUniforms.uEnergy.value = damp(glassUniforms.uEnergy.value, energy, 5.2, dt);
+
+    const targetScale = hovered ? 1.055 : 1;
+    scale = damp(scale, targetScale, 6.5, dt);
+    group.scale.setScalar(scale);
+    group.rotation.y = damp(group.rotation.y, pointer.x * 0.22 + elapsed * 0.055, 3.2, dt);
+    group.rotation.x = damp(group.rotation.x, -pointer.y * 0.17 + Math.sin(elapsed * 0.5) * 0.04, 3.2, dt);
+
+    ribbons.rotation.x += dt * 0.075;
+    ribbons.rotation.y -= dt * 0.105;
+    ribbons.rotation.z = Math.sin(elapsed * 0.31) * 0.22;
+
+    particles.rotation.y += dt * 0.16;
+    particles.rotation.x = Math.sin(elapsed * 0.22) * 0.24;
+    particleMat.opacity = 0.58 + Math.sin(elapsed * 2.2) * 0.13;
+
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+</script>
+</body>
+</html>

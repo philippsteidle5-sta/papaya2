@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0e172a" />
+      <stop offset="70%" stop-color="#04060c" />
+      <stop offset="100%" stop-color="#020306" />
+    </radialGradient>
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="25%" stop-color="#00f5ff" />
+      <stop offset="60%" stop-color="#ff008a" />
+      <stop offset="90%" stop-color="#7928ca" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+    <filter id="neonBlur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="115" fill="url(#bgGlow)" />
+  <rect width="504" height="504" x="4" y="4" rx="111" fill="none" stroke="#00f5ff" stroke-width="2" stroke-opacity="0.3" />
+
+  <!-- Outer Concentric Sci-Fi Rings -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#00f5ff" stroke-width="2" stroke-opacity="0.3" stroke-dasharray="12 18" />
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#ff008a" stroke-width="2" stroke-opacity="0.4" stroke-dasharray="24 12" />
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#a855f7" stroke-width="2" stroke-opacity="0.5" />
+
+  <!-- Orbital Tilted Rings -->
+  <ellipse cx="256" cy="256" rx="190" ry="70" fill="none" stroke="#00f5ff" stroke-width="3" stroke-opacity="0.8" transform="rotate(-30 256 256)" filter="url(#neonBlur)" />
+  <ellipse cx="256" cy="256" rx="190" ry="70" fill="none" stroke="#ff008a" stroke-width="3" stroke-opacity="0.8" transform="rotate(30 256 256)" filter="url(#neonBlur)" />
+
+  <!-- Central Nebula Atmosphere -->
+  <circle cx="256" cy="256" r="130" fill="url(#coreGlow)" opacity="0.85" />
+
+  <!-- Core White Energy Spot -->
+  <circle cx="256" cy="256" r="28" fill="#ffffff" filter="url(#neonBlur)" />
+  <circle cx="256" cy="256" r="14" fill="#ffffff" />
+
+  <!-- Crosshairs / Cardinal Ticks -->
+  <line x1="256" y1="36" x2="256" y2="70" stroke="#00f5ff" stroke-width="3" stroke-linecap="round" />
+  <line x1="256" y1="442" x2="256" y2="476" stroke="#00f5ff" stroke-width="3" stroke-linecap="round" />
+  <line x1="36" y1="256" x2="70" y2="256" stroke="#00f5ff" stroke-width="3" stroke-linecap="round" />
+  <line x1="442" y1="256" x2="476" y2="256" stroke="#00f5ff" stroke-width="3" stroke-linecap="round" />
+
+  <!-- Brand Typography -->
+  <text x="256" y="380" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="28" fill="#00f5ff" text-anchor="middle" letter-spacing="8" filter="url(#neonBlur)">N.E.O.</text>
+  <text x="256" y="405" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="12" fill="#e2e8f0" text-anchor="middle" letter-spacing="4" opacity="0.8">PAPAYA OS</text>
+</svg>

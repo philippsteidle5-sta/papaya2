@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>All-in-One Space Kalender — Meeting, Privat, Subscriptions, Rechnungen, Fokus</title>
+<style>
+  :root {
+    --background: #0a0a0b;
+    --card: #141416;
+    --card-hover: #1c1c20;
+    --foreground: #fafafa;
+    --muted: #232326;
+    --muted-foreground: #8b8b93;
+    --border: #2a2a2e;
+    --input: #3a3a40;
+    --primary: #6d6cf5;
+    --primary-glow: rgba(109,108,245,0.35);
+    --primary-foreground: #ffffff;
+    
+    /* 5 Core Categories */
+    --cat-meeting: #a855f7;      /* Meeting / Termin (Lila) */
+    --cat-privat: #10b981;       /* Privat / Persönlich (Smaragdgrün) */
+    --cat-subscriptions: #6d6cf5;/* Subscriptions / Abos (Königsblau) */
+    --cat-rechnungen: #ef4444;   /* Rechnungen / Zahlungen (Rot) */
+    --cat-fokus: #f59e0b;        /* Fokus / Deep Work (Bernsteingold) */
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    background-image: 
+      radial-gradient(ellipse 60% 40% at 50% -20%, rgba(109,108,245,0.12), transparent),
+      radial-gradient(ellipse 40% 30% at 80% 100%, rgba(16,185,129,0.06), transparent);
+  }
+
+  .workspace-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 27.5rem;
+    margin: 0 auto;
+    animation: pop .35s cubic-bezier(.16, 1, .3, 1);
+  }
+
+  .calendar {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 22px;
+    width: 100%;
+    flex: 1;
+    box-shadow: 0 25px 60px -15px rgba(0,0,0,.7), 0 0 20px rgba(109,108,245,0.05);
+    position: relative;
+    overflow: hidden;
+  }
+
+  @keyframes pop {
+    from { transform: scale(.96) translateY(8px); opacity: 0; }
+    to { transform: scale(1) translateY(0); opacity: 1; }
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .header h2 {
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    letter-spacing: -0.01em;
+  }
+
+  .today-badge {
+    border: 1px solid var(--input);
+    color: var(--muted-foreground);
+    background: rgba(35,35,38,.4);
+    border-radius: 9999px;
+    padding: 4px 12px;
+    font-size: 11px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .today-badge:hover {
+    color: var(--foreground);
+    border-color: var(--primary);
+  }
+
+  .view-toggle {
+    display: flex;
+    background: var(--muted);
+    border-radius: 9999px;
+    padding: 2px;
+    border: 1px solid var(--border);
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .view-toggle button {
+    background: none;
+    border: none;
+    color: var(--muted-foreground);
+    padding: 3px 8px;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .view-toggle button.active {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .nav-btns {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .nav-btns button {
+    background: none;
+    border: none;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    transition: all .15s;
+  }
+  .nav-btns button:hover {
+    background: var(--muted);
+    color: var(--foreground);
+  }
+
+  .add-btn {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border: none;
+    cursor: pointer;
+    height: 30px;
+    width: 46px;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 20px -3px var(--primary-glow);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .add-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 12px 25px -2px var(--primary-glow);
+  }
+  .add-btn:active {
+    transform: scale(.95);
+  }
+
+  /* 5 Category Filter Tabs */
+  .category-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+  }
+  .cat-pill {
+    padding: 4px 10px;
+    border-radius: 9999px;
+    border: 1px solid var(--border);
+    background: rgba(35,35,38,.4);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all .15s;
+  }
+  .cat-pill:hover {
+    color: var(--foreground);
+    border-color: var(--input);
+  }
+  .cat-pill.active {
+    background: rgba(255,255,255,0.1);
+    color: var(--foreground);
+    border-color: rgba(255,255,255,0.25);
+  }
+
+  /* Weekdays */
+  .weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    margin-bottom: 8px;
+  }
+  .weekdays div {
+    background: rgba(35,35,38,.5);
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    padding: 6px 0;
+    text-align: center;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    color: var(--muted-foreground);
+  }
+
+  /* Days Grid */
+  .days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+  }
+  .day {
+    position: relative;
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    background: rgba(35,35,38,.5);
+    color: var(--foreground);
+    transition: all .15s cubic-bezier(.16, 1, .3, 1);
+  }
+  .day:hover {
+    border-color: var(--input);
+    background: var(--card-hover);
+    transform: translateY(-1px);
+  }
+  .day:active {
+    transform: scale(.95);
+  }
+  .day.muted {
+    background: rgba(35,35,38,.25);
+    color: rgba(139,139,147,.5);
+    border-color: rgba(42,42,46,.5);
+  }
+  .day.active {
+    border-color: rgba(109,108,245,.8);
+    background: rgba(109,108,245,.12);
+    box-shadow: 0 0 15px rgba(109,108,245,.2);
+  }
+  .day.today {
+    font-weight: 700;
+  }
+  .day.today::before {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--primary);
+  }
+
+  .day .indicator-dots {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: flex;
+    gap: 2px;
+  }
+  .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    display: inline-block;
+  }
+
+  /* Empty State Quick Actions */
+  .quick-start-bar {
+    background: rgba(35,35,38,.3);
+    border: 1px dashed var(--border);
+    border-radius: 14px;
+    padding: 12px;
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .quick-start-title {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    font-weight: 500;
+  }
+  .quick-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .quick-chip {
+    padding: 5px 11px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: rgba(35,35,38,.6);
+    color: var(--foreground);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .15s;
+  }
+  .quick-chip:hover {
+    transform: translateY(-1px);
+    border-color: var(--input);
+  }
+
+  /* Legend */
+  .legend {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    color: var(--muted-foreground);
+    flex-wrap: wrap;
+  }
+  .legend-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+  }
+  .legend .count span {
+    color: var(--foreground);
+    font-weight: 700;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .footer-icons {
+    display: flex;
+    gap: 14px;
+    color: var(--muted-foreground);
+  }
+  .footer-icons button {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    border-radius: 6px;
+    transition: color .15s;
+  }
+  .footer-icons button:hover {
+    color: var(--foreground);
+  }
+  .total {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+  }
+  .total span {
+    color: var(--foreground);
+    font-size: 13px;
+    font-weight: 700;
+    margin-left: 4px;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 20px;
+    width: 100%;
+    max-width: 20rem;
+    box-shadow: 0 25px 60px -15px rgba(0,0,0,.7);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .sidebar-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    color: var(--muted-foreground);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .upcoming-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .upcoming-item {
+    background: rgba(35,35,38,.5);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    transition: all .15s;
+    cursor: pointer;
+  }
+  .upcoming-item:hover {
+    border-color: var(--input);
+    background: var(--card-hover);
+    transform: translateX(2px);
+  }
+  .upcoming-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .upcoming-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .upcoming-meta {
+    font-size: 10px;
+    color: var(--muted-foreground);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .countdown-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 9999px;
+    background: rgba(109,108,245,.15);
+    color: var(--primary);
+    border: 1px solid rgba(109,108,245,.3);
+    white-space: nowrap;
+  }
+  .countdown-badge.urgent {
+    background: rgba(239,68,68,.15);
+    color: var(--cat-rechnungen);
+    border-color: rgba(239,68,68,.3);
+  }
+
+  /* Overlays */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    background: rgba(20,20,22,.96);
+    backdrop-filter: blur(12px);
+    border-radius: 23px;
+    display: none;
+    flex-direction: column;
+    padding: 24px;
+    animation: overlayIn .25s cubic-bezier(.16, 1, .3, 1);
+  }
+  .overlay.open { display: flex; }
+
+  @keyframes overlayIn {
+    from { opacity: 0; transform: scale(.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .overlay .close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    padding: 4px;
+  }
+  .overlay .close-btn:hover { color: var(--foreground); }
+
+  .overlay-header {
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .overlay-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .overlay-subtitle { font-size: 11px; color: var(--muted-foreground); }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  .input-field, .select-field {
+    width: 100%;
+    border: 1px solid var(--input);
+    background: rgba(35,35,38,.4);
+    color: var(--foreground);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 12px;
+    outline: none;
+    transition: all .15s;
+  }
+  .input-field:focus, .select-field:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(109,108,245,.2);
+  }
+  .form-row { display: flex; gap: 8px; }
+
+  .submit-btn {
+    margin-top: 6px;
+    width: 100%;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border: none;
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 8px 16px -2px var(--primary-glow);
+    transition: all .15s;
+  }
+  .submit-btn:hover { opacity: .92; }
+
+  .day-events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-height: 50vh;
+    overflow-y: auto;
+    margin-top: 10px;
+  }
+  .event-card {
+    background: rgba(35,35,38,.6);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .event-meta {
+    font-size: 10px;
+    color: var(--muted-foreground);
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: rgba(20,20,22,0.95);
+    border: 1px solid var(--border);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+    backdrop-filter: blur(8px);
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-size: 12px;
+    color: var(--foreground);
+    z-index: 100;
+    transform: translateY(60px);
+    opacity: 0;
+    transition: all .25s cubic-bezier(.16, 1, .3, 1);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="workspace-container">
+  <!-- MAIN CALENDAR -->
+  <div class="calendar">
+    <!-- HEADER -->
+    <div class="header">
+      <div class="header-left">
+        <h2 id="monthLabel">September, 2026</h2>
+        <button class="today-badge" onclick="jumpToToday()">Today</button>
+        <div class="view-toggle">
+          <button id="monthViewBtn" class="active" onclick="switchView('month')">MONAT</button>
+          <button id="weekViewBtn" onclick="switchView('week')">WOCHE</button>
+        </div>
+        <div class="nav-btns">
+          <button title="Vorheriger Monat/Woche" onclick="navPrev()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <button title="Nächster Monat/Woche" onclick="navNext()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <button class="add-btn" title="Eintrag hinzufügen (+)" onclick="openAddModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+      </button>
+    </div>
+
+    <!-- 5 CATEGORY FILTER TABS -->
+    <div class="category-filter-bar">
+      <button class="cat-pill active" id="filter-all" onclick="setCategoryFilter('all')">Alle anzeigen</button>
+      <button class="cat-pill" id="filter-meeting" onclick="setCategoryFilter('meeting')">
+        <span class="dot" style="background:var(--cat-meeting)"></span>Meeting
+      </button>
+      <button class="cat-pill" id="filter-privat" onclick="setCategoryFilter('privat')">
+        <span class="dot" style="background:var(--cat-privat)"></span>Privat
+      </button>
+      <button class="cat-pill" id="filter-subscriptions" onclick="setCategoryFilter('subscriptions')">
+        <span class="dot" style="background:var(--cat-subscriptions)"></span>Subscriptions
+      </button>
+      <button class="cat-pill" id="filter-rechnungen" onclick="setCategoryFilter('rechnungen')">
+        <span class="dot" style="background:var(--cat-rechnungen)"></span>Rechnungen
+      </button>
+      <button class="cat-pill" id="filter-fokus" onclick="setCategoryFilter('fokus')">
+        <span class="dot" style="background:var(--cat-fokus)"></span>Fokus
+      </button>
+    </div>
+
+    <!-- WEEKDAYS BAR -->
+    <div class="weekdays">
+      <div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div><div>SUN</div>
+    </div>
+
+    <!-- DAYS GRID -->
+    <div class="days" id="daysGrid"></div>
+
+    <!-- QUICK-START CHIPS (Wenn noch wenige oder keine Einträge vorhanden sind) -->
+    <div class="quick-start-bar" id="quickStartBar">
+      <div class="quick-start-title">1-Klick Schnellstart: Wähle eine Kategorie zum Eintragen</div>
+      <div class="quick-chips">
+        <button class="quick-chip" onclick="openAddWithCategory('meeting')">
+          <span class="dot" style="background:var(--cat-meeting)"></span>+ Meeting
+        </button>
+        <button class="quick-chip" onclick="openAddWithCategory('privat')">
+          <span class="dot" style="background:var(--cat-privat)"></span>+ Privat
+        </button>
+        <button class="quick-chip" onclick="openAddWithCategory('subscriptions')">
+          <span class="dot" style="background:var(--cat-subscriptions)"></span>+ Subscription
+        </button>
+        <button class="quick-chip" onclick="openAddWithCategory('rechnungen')">
+          <span class="dot" style="background:var(--cat-rechnungen)"></span>+ Rechnung
+        </button>
+        <button class="quick-chip" onclick="openAddWithCategory('fokus')">
+          <span class="dot" style="background:var(--cat-fokus)"></span>+ Fokus-Block
+        </button>
+      </div>
+    </div>
+
+    <!-- LEGEND -->
+    <div class="legend">
+      <div class="legend-left">
+        <span class="legend-item" onclick="setCategoryFilter('meeting')"><span class="dot" style="background:var(--cat-meeting)"></span>MEETING</span>
+        <span class="legend-item" onclick="setCategoryFilter('privat')"><span class="dot" style="background:var(--cat-privat)"></span>PRIVAT</span>
+        <span class="legend-item" onclick="setCategoryFilter('subscriptions')"><span class="dot" style="background:var(--cat-subscriptions)"></span>SUBSCRIPTIONS</span>
+        <span class="legend-item" onclick="setCategoryFilter('rechnungen')"><span class="dot" style="background:var(--cat-rechnungen)"></span>RECHNUNGEN</span>
+        <span class="legend-item" onclick="setCategoryFilter('fokus')"><span class="dot" style="background:var(--cat-fokus)"></span>FOKUS</span>
+      </div>
+      <span class="count" id="countLabel"><span>0</span> EINTRÄGE</span>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="footer-icons">
+        <button title="Live-Suche" onclick="openOverlay('searchOverlay')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </button>
+        <button title="Export (CSV / JSON)" onclick="openOverlay('exportOverlay')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+        </button>
+        <button title="Statistik & Diagramm" onclick="openOverlay('statsOverlay')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+        </button>
+        <button title="Nächste 5 Termine" onclick="openOverlay('upcomingOverlay')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </button>
+      </div>
+      <div class="total" id="monthlyTotalDisplay">ZAHLUNGEN : <span>$0.00</span></div>
+    </div>
+
+    <!-- OVERLAY: ADD ENTRY -->
+    <div class="overlay" id="addOverlay">
+      <button class="close-btn" onclick="closeOverlay('addOverlay')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <div class="overlay-header">
+        <h3 class="overlay-title">Neuen Eintrag anlegen</h3>
+        <p class="overlay-subtitle">Meeting, Privat, Subscription, Rechnung oder Fokus-Block</p>
+      </div>
+      <form class="form-group" onsubmit="handleFormSubmit(event)">
+        <input type="text" id="entryName" class="input-field" placeholder="Titel (z. B. Team Meeting, Fitness, Netflix, Miete)" required />
+        
+        <div class="form-row">
+          <select id="entryCategory" class="select-field" onchange="handleCategoryChange(this.value)">
+            <option value="meeting">🟣 Meeting</option>
+            <option value="privat">🟢 Privat</option>
+            <option value="subscriptions">🔵 Subscriptions</option>
+            <option value="rechnungen">🔴 Rechnungen</option>
+            <option value="fokus">🟡 Fokus / Deep Work</option>
+          </select>
+          <input type="date" id="entryDate" class="input-field" required />
+        </div>
+
+        <div class="form-row" id="timeRow">
+          <input type="time" id="entryTime" class="input-field" placeholder="Uhrzeit (optional)" />
+          <input type="number" step="0.01" id="entryAmount" class="input-field" placeholder="Betrag ($ / optional)" />
+        </div>
+
+        <div class="form-row">
+          <select id="entryRepeat" class="select-field">
+            <option value="none">Einmalig</option>
+            <option value="monthly">Monatlich wiederkehrend</option>
+            <option value="yearly">Jährlich wiederkehrend</option>
+            <option value="weekly">Wöchentlich</option>
+          </select>
+        </div>
+
+        <button type="submit" class="submit-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+          Eintrag speichern
+        </button>
+      </form>
+    </div>
+
+    <!-- OVERLAY: DAY DETAIL -->
+    <div class="overlay" id="dayDetailOverlay">
+      <button class="close-btn" onclick="closeOverlay('dayDetailOverlay')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <div class="overlay-header">
+        <h3 class="overlay-title" id="dayDetailTitle">Tagesdetails</h3>
+        <p class="overlay-subtitle" id="dayDetailSubtitle">Alle Termine & Fälligkeiten</p>
+      </div>
+      <div class="day-events-list" id="dayEventsList"></div>
+      <button class="submit-btn" style="margin-top:14px;" onclick="openAddForCurrentDay()">
+        + Eintrag für diesen Tag anlegen
+      </button>
+    </div>
+
+    <!-- OVERLAY: LIVE SEARCH -->
+    <div class="overlay" id="searchOverlay">
+      <button class="close-btn" onclick="closeOverlay('searchOverlay')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <div class="overlay-header">
+        <h3 class="overlay-title">Live-Suche & Filter</h3>
+        <p class="overlay-subtitle">Durchsuche Meetings, Privates, Subscriptions & Rechnungen</p>
+      </div>
+      <input type="text" class="input-field" placeholder="Suchbegriff eingeben..." id="liveSearchInput" oninput="handleSearch(this.value)" />
+      <div class="day-events-list" id="searchResultsList">
+        <p style="text-align:center;font-size:11px;color:var(--muted-foreground);padding:20px 0;">Tippe einen Suchbegriff ein...</p>
+      </div>
+    </div>
+
+    <!-- OVERLAY: EXPORT -->
+    <div class="overlay" id="exportOverlay">
+      <button class="close-btn" onclick="closeOverlay('exportOverlay')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <div class="overlay-header">
+        <h3 class="overlay-title">Kalenderdaten exportieren</h3>
+        <p class="overlay-subtitle">Lade deine erfassten Daten herunter</p>
+      </div>
+      <div style="display:flex;gap:10px;width:100%;margin-top:16px;">
+        <button class="submit-btn" onclick="exportData('csv')">CSV Export</button>
+        <button class="submit-btn" style="background:#232326;border:1px solid var(--border);" onclick="exportData('json')">JSON Export</button>
+      </div>
+    </div>
+
+    <!-- OVERLAY: STATS -->
+    <div class="overlay" id="statsOverlay">
+      <button class="close-btn" onclick="closeOverlay('statsOverlay')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <div class="overlay-header">
+        <h3 class="overlay-title">Kategorien- & Finanz-Übersicht</h3>
+        <p class="overlay-subtitle">Verteilung über die 5 Bereiche</p>
+      </div>
+      <div id="statsContent" style="width:100%"></div>
+    </div>
+    <!-- OVERLAY: UPCOMING 5 ITEMS -->
+    <div class="overlay" id="upcomingOverlay">
+      <button class="close-btn" onclick="closeOverlay('upcomingOverlay')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <div class="overlay-header">
+        <h3 class="overlay-title">Nächste 5 Termine & Fälligkeiten</h3>
+        <p class="overlay-subtitle">Chronologische Übersicht mit Countdown</p>
+      </div>
+      <div class="upcoming-list" id="upcomingList" style="margin-top:10px;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toastNotice"><span id="toastMsg">Aktion ausgeführt</span></div>
+
+<script>
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  
+  // 5 Clean Categories
+  const CATEGORIES = {
+    meeting: { label: "Meeting", color: "var(--cat-meeting)", code: "#a855f7" },
+    privat: { label: "Privat", color: "var(--cat-privat)", code: "#10b981" },
+    subscriptions: { label: "Subscriptions", color: "var(--cat-subscriptions)", code: "#6d6cf5" },
+    rechnungen: { label: "Rechnungen", color: "var(--cat-rechnungen)", code: "#ef4444" },
+    fokus: { label: "Fokus", color: "var(--cat-fokus)", code: "#f59e0b" },
+  };
+
+  const TODAY = new Date();
+  let currentYear = TODAY.getFullYear();
+  let currentMonth = TODAY.getMonth();
+  let currentView = "month";
+  let activeFilter = "all";
+  let selectedDateStr = formatDate(TODAY);
+
+  // Initial Empty State (Startet komplett sauber ohne Demo-Abos)
+  let entries = [];
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function formatDate(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+  function showToast(msg) {
+    const t = document.getElementById("toastNotice");
+    document.getElementById("toastMsg").textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2800);
+  }
+
+  function updateMonthLabel() {
+    document.getElementById("monthLabel").textContent = `${MONTHS[currentMonth]}, ${currentYear}`;
+  }
+
+  function navPrev() {
+    if (currentView === "month") {
+      currentMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+      if (currentMonth === 11) currentYear--;
+    } else {
+      const d = new Date(selectedDateStr);
+      d.setDate(d.getDate() - 7);
+      selectedDateStr = formatDate(d);
+      currentMonth = d.getMonth();
+      currentYear = d.getFullYear();
+    }
+    updateMonthLabel();
+    renderCalendar();
+  }
+
+  function navNext() {
+    if (currentView === "month") {
+      currentMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+      if (currentMonth === 0) currentYear++;
+    } else {
+      const d = new Date(selectedDateStr);
+      d.setDate(d.getDate() + 7);
+      selectedDateStr = formatDate(d);
+      currentMonth = d.getMonth();
+      currentYear = d.getFullYear();
+    }
+    updateMonthLabel();
+    renderCalendar();
+  }
+
+  function jumpToToday() {
+    currentYear = TODAY.getFullYear();
+    currentMonth = TODAY.getMonth();
+    selectedDateStr = formatDate(TODAY);
+    updateMonthLabel();
+    renderCalendar();
+    showToast("Zu Heute gesprungen");
+  }
+
+  function switchView(view) {
+    currentView = view;
+    document.getElementById("monthViewBtn").classList.toggle("active", view === "month");
+    document.getElementById("weekViewBtn").classList.toggle("active", view === "week");
+    renderCalendar();
+  }
+
+  function setCategoryFilter(cat) {
+    activeFilter = cat;
+    document.querySelectorAll(".cat-pill").forEach(p => p.classList.remove("active"));
+    const activeBtn = document.getElementById(`filter-${cat}`);
+    if (activeBtn) activeBtn.classList.add("active");
+    renderCalendar();
+  }
+
+  function renderCalendar() {
+    const grid = document.getElementById("daysGrid");
+    grid.innerHTML = "";
+    const todayStr = formatDate(TODAY);
+
+    let daysToRender = [];
+
+    if (currentView === "month") {
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const firstDayIdx = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7;
+      const prevMonthDays = new Date(currentYear, currentMonth, 0).getDate();
+
+      for (let i = firstDayIdx - 1; i >= 0; i--) {
+        const d = prevMonthDays - i;
+        const prevM = currentMonth === 0 ? 12 : currentMonth;
+        const prevY = currentMonth === 0 ? currentYear - 1 : currentYear;
+        daysToRender.push({ date: d, dateStr: `${prevY}-${pad(prevM)}-${pad(d)}`, muted: true });
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        daysToRender.push({ date: d, dateStr: `${currentYear}-${pad(currentMonth + 1)}-${pad(d)}`, muted: false });
+      }
+
+      const totalSlots = daysToRender.length <= 35 ? 35 : 42;
+      const remaining = totalSlots - daysToRender.length;
+      for (let d = 1; d <= remaining; d++) {
+        const nextM = currentMonth === 11 ? 1 : currentMonth + 2;
+        const nextY = currentMonth === 11 ? currentYear + 1 : currentYear;
+        daysToRender.push({ date: d, dateStr: `${nextY}-${pad(nextM)}-${pad(d)}`, muted: true });
+      }
+    } else {
+      const cur = new Date(selectedDateStr || TODAY);
+      const dayOfWeek = (cur.getDay() + 6) % 7;
+      const monday = new Date(cur);
+      monday.setDate(cur.getDate() - dayOfWeek);
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        daysToRender.push({ date: d.getDate(), dateStr: formatDate(d), muted: d.getMonth() !== currentMonth });
+      }
+    }
+
+    daysToRender.forEach((day) => {
+      let dayEntries = entries.filter(e => e.date === day.dateStr);
+      if (activeFilter !== "all") {
+        dayEntries = dayEntries.filter(e => e.category === activeFilter);
+      }
+
+      const isSelected = day.dateStr === selectedDateStr;
+      const isToday = day.dateStr === todayStr;
+
+      const btn = document.createElement("button");
+      btn.className = "day" + (day.muted ? " muted" : "") + (isSelected ? " active" : "") + (isToday ? " today" : "");
+
+      let dotsHtml = "";
+      if (dayEntries.length > 0) {
+        dotsHtml = '<span class="indicator-dots">';
+        dayEntries.slice(0, 4).forEach(e => {
+          const col = CATEGORIES[e.category]?.color || "var(--primary)";
+          dotsHtml += `<span class="dot" style="background:${col}"></span>`;
+        });
+        dotsHtml += '</span>';
+      }
+
+      btn.innerHTML = `${dotsHtml}<span>${day.date}</span>`;
+
+      btn.onclick = () => {
+        selectedDateStr = day.dateStr;
+        renderCalendar();
+        openDayDetail(day.dateStr);
+      };
+
+      grid.appendChild(btn);
+    });
+
+    renderMetrics();
+    renderSidebar();
+  }
+
+  function renderMetrics() {
+    const curMonthPrefix = `${currentYear}-${pad(currentMonth + 1)}`;
+    const monthEntries = entries.filter(e => e.date.startsWith(curMonthPrefix));
+    
+    let totalSpend = 0;
+    monthEntries.forEach(e => {
+      if (e.amount) totalSpend += parseFloat(e.amount);
+    });
+
+    document.getElementById("monthlyTotalDisplay").innerHTML = 
+      `ZAHLUNGEN : <span>$${totalSpend.toFixed(2)}</span>`;
+
+    document.getElementById("countLabel").innerHTML = 
+      `<span>${entries.length}</span> EINTRÄGE GESAMT`;
+  }
+
+  function renderSidebar() {
+    const container = document.getElementById("upcomingList");
+    container.innerHTML = "";
+    const todayStr = formatDate(TODAY);
+
+    const upcoming = [...entries]
+      .filter(e => e.date >= todayStr)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 5);
+
+    document.getElementById("sidebarCount").textContent = `${upcoming.length} anstehend`;
+
+    if (upcoming.length === 0) {
+      container.innerHTML = '<div style="font-size:11px;color:var(--muted-foreground);text-align:center;padding:16px 0;">Noch keine anstehenden Termine.<br>Nutze die Buttons links zum Schnellstart!</div>';
+      return;
+    }
+
+    upcoming.forEach(e => {
+      const diffTime = new Date(e.date) - new Date(todayStr);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      let badgeText = `in ${diffDays}d`;
+      let isUrgent = diffDays <= 1;
+      if (diffDays === 0) badgeText = "HEUTE";
+      else if (diffDays === 1) badgeText = "MORGEN";
+
+      const catCol = CATEGORIES[e.category]?.color || "var(--primary)";
+
+      const item = document.createElement("div");
+      item.className = "upcoming-item";
+      item.innerHTML = `
+        <div class="upcoming-info">
+          <div class="upcoming-name">
+            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${catCol};margin-right:6px;"></span>
+            ${e.name}
+          </div>
+          <div class="upcoming-meta">
+            <span>${CATEGORIES[e.category]?.label || e.category}</span>
+            <span>·</span>
+            <span>${e.date}</span>
+            ${e.amount ? `<span>· $${parseFloat(e.amount).toFixed(2)}</span>` : ''}
+          </div>
+        </div>
+        <span class="countdown-badge ${isUrgent ? 'urgent' : ''}">${badgeText}</span>
+      `;
+
+      item.onclick = () => {
+        selectedDateStr = e.date;
+        renderCalendar();
+        openDayDetail(e.date);
+      };
+
+      container.appendChild(item);
+    });
+  }
+
+  function openOverlay(id) {
+    document.getElementById(id).classList.add("open");
+    if (id === "statsOverlay") renderStats();
+  }
+  function closeOverlay(id) {
+    document.getElementById(id).classList.remove("open");
+  }
+
+  function openAddModal() {
+    document.getElementById("entryDate").value = selectedDateStr;
+    openOverlay("addOverlay");
+  }
+
+  function openAddWithCategory(cat) {
+    document.getElementById("entryCategory").value = cat;
+    document.getElementById("entryDate").value = selectedDateStr;
+    openOverlay("addOverlay");
+  }
+
+  function openAddForCurrentDay() {
+    closeOverlay("dayDetailOverlay");
+    document.getElementById("entryDate").value = selectedDateStr;
+    openOverlay("addOverlay");
+  }
+
+  function handleFormSubmit(e) {
+    e.preventDefault();
+    const name = document.getElementById("entryName").value.trim();
+    const category = document.getElementById("entryCategory").value;
+    const date = document.getElementById("entryDate").value;
+    const time = document.getElementById("entryTime").value;
+    const amount = document.getElementById("entryAmount").value;
+    const repeat = document.getElementById("entryRepeat").value;
+
+    if (!name || !date) return;
+
+    const newEntry = {
+      id: "e-" + Date.now(),
+      name,
+      category,
+      date,
+      time: time || undefined,
+      amount: amount ? parseFloat(amount) : undefined,
+      repeat
+    };
+
+    entries.push(newEntry);
+    closeOverlay("addOverlay");
+    e.target.reset();
+    renderCalendar();
+    showToast(`✓ "${name}" in ${CATEGORIES[category].label} angelegt`);
+  }
+
+  function openDayDetail(dateStr) {
+    const list = document.getElementById("dayEventsList");
+    list.innerHTML = "";
+    document.getElementById("dayDetailTitle").textContent = `Details für ${dateStr}`;
+
+    const dayItems = entries.filter(e => e.date === dateStr);
+    document.getElementById("dayDetailSubtitle").textContent = 
+      dayItems.length === 0 ? "Keine Einträge an diesem Tag" : `${dayItems.length} Eintrag/Einträge vorhanden`;
+
+    if (dayItems.length === 0) {
+      list.innerHTML = '<div style="font-size:12px;color:var(--muted-foreground);text-align:center;padding:24px 0;">Keine Einträge für dieses Datum vorhanden.</div>';
+    } else {
+      dayItems.forEach(e => {
+        const cat = CATEGORIES[e.category] || CATEGORIES.meeting;
+        const card = document.createElement("div");
+        card.className = "event-card";
+        card.innerHTML = `
+          <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+            <span style="width:8px;height:8px;border-radius:50%;background:${cat.color};flex-shrink:0;"></span>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:var(--foreground)">${e.name}</div>
+              <div class="event-meta">
+                ${cat.label} ${e.time ? `· ${e.time} Uhr` : ''} ${e.amount ? `· $${e.amount.toFixed(2)}` : ''}
+              </div>
+            </div>
+          </div>
+          <button style="background:none;border:none;color:#ef4444;cursor:pointer;padding:4px;" onclick="deleteEntry('${e.id}')" title="Löschen">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+          </button>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    openOverlay("dayDetailOverlay");
+  }
+
+  function deleteEntry(id) {
+    entries = entries.filter(e => e.id !== id);
+    renderCalendar();
+    openDayDetail(selectedDateStr);
+    showToast("Eintrag gelöscht");
+  }
+
+  function handleSearch(q) {
+    const list = document.getElementById("searchResultsList");
+    list.innerHTML = "";
+    if (!q.trim()) {
+      list.innerHTML = '<p style="text-align:center;font-size:11px;color:var(--muted-foreground);padding:20px 0;">Tippe einen Suchbegriff ein...</p>';
+      return;
+    }
+    const filtered = entries.filter(e => 
+      e.name.toLowerCase().includes(q.toLowerCase()) || 
+      CATEGORIES[e.category]?.label.toLowerCase().includes(q.toLowerCase())
+    );
+    if (filtered.length === 0) {
+      list.innerHTML = '<p style="text-align:center;font-size:11px;color:var(--muted-foreground);padding:20px 0;">Keine Treffer</p>';
+      return;
+    }
+    filtered.forEach(e => {
+      const card = document.createElement("div");
+      card.className = "event-card";
+      card.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${CATEGORIES[e.category].color}"></span>
+          <div>
+            <div style="font-size:12px;font-weight:600;">${e.name}</div>
+            <div class="event-meta">${CATEGORIES[e.category].label} · ${e.date}</div>
+          </div>
+        </div>
+        <button class="today-badge" onclick="jumpToDate('${e.date}')">Öffnen</button>
+      `;
+      list.appendChild(card);
+    });
+  }
+
+  function jumpToDate(d) {
+    selectedDateStr = d;
+    const parts = d.split("-").map(Number);
+    currentYear = parts[0];
+    currentMonth = parts[1] - 1;
+    updateMonthLabel();
+    renderCalendar();
+    closeOverlay("searchOverlay");
+    openDayDetail(d);
+  }
+
+  function exportData(format) {
+    let dataStr = "";
+    let filename = `calendar-${formatDate(TODAY)}`;
+    if (format === "csv") {
+      const rows = [["ID","Name","Category","Date","Time","Amount","Repeat"]];
+      entries.forEach(e => rows.push([`"${e.id}"`,`"${e.name}"`,`"${e.category}"`,`"${e.date}"`,`"${e.time||''}"`,e.amount||0,`"${e.repeat||'none'}"`]));
+      dataStr = "data:text/csv;charset=utf-8," + rows.map(r => r.join(",")).join("\n");
+      filename += ".csv";
+    } else {
+      dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(entries, null, 2));
+      filename += ".json";
+    }
+    const a = document.createElement("a");
+    a.href = dataStr;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    closeOverlay("exportOverlay");
+    showToast(`Export als ${format.toUpperCase()} abgeschlossen`);
+  }
+
+  function renderStats() {
+    const c = document.getElementById("statsContent");
+    const counts = { meeting: 0, privat: 0, subscriptions: 0, rechnungen: 0, fokus: 0 };
+    let totalSpend = 0;
+    entries.forEach(e => {
+      if (counts[e.category] !== undefined) counts[e.category]++;
+      if (e.amount) totalSpend += parseFloat(e.amount);
+    });
+
+    c.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+        <div style="background:rgba(35,35,38,.5);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted-foreground)">🟣 Meetings</div>
+          <div style="font-size:16px;font-weight:700;color:var(--cat-meeting);margin-top:2px;">${counts.meeting}</div>
+        </div>
+        <div style="background:rgba(35,35,38,.5);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted-foreground)">🟢 Privat</div>
+          <div style="font-size:16px;font-weight:700;color:var(--cat-privat);margin-top:2px;">${counts.privat}</div>
+        </div>
+        <div style="background:rgba(35,35,38,.5);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted-foreground)">🔵 Subscriptions</div>
+          <div style="font-size:16px;font-weight:700;color:var(--cat-subscriptions);margin-top:2px;">${counts.subscriptions}</div>
+        </div>
+        <div style="background:rgba(35,35,38,.5);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted-foreground)">🔴 Rechnungen</div>
+          <div style="font-size:16px;font-weight:700;color:var(--cat-rechnungen);margin-top:2px;">${counts.rechnungen}</div>
+        </div>
+        <div style="grid-column:span 2;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--cat-fokus)">🟡 Fokus-Blöcke: <b>${counts.fokus}</b> · Gesamtvolumen: <b>$${totalSpend.toFixed(2)}</b></div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Initialize
+  document.getElementById("entryDate").value = formatDate(TODAY);
+  updateMonthLabel();
+  renderCalendar();
+</script>
+
+</body>
+</html>

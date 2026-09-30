@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARVIS - Standalone Neural Interface</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Three.js for 3D Particle Sphere -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Marked.js for Markdown Processing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #05080d;
+      color: #d9f4ff;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-panel {
+      background: rgba(5, 8, 13, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(78, 232, 255, 0.15);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+    /* Hide scrollbar */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* Custom Range Slider */
+    input[type="range"]::-webkit-slider-thumb {
+      background: #4ee8ff;
+      cursor: pointer;
+    }
+    /* Ambient Glows */
+    .glow-cyan {
+      box-shadow: 0 0 20px rgba(78, 232, 255, 0.25);
+    }
+    /* Speaking Karaoke Animation */
+    @keyframes pulse-slow {
+      0%, 100% { opacity: 0.2; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.03); }
+    }
+    .pulse-glow {
+      animation: pulse-slow 3s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="relative min-h-screen w-full overflow-hidden select-none">
+
+  <!-- Three.js Canvas Container -->
+  <div id="canvas-container" class="absolute inset-0 z-0"></div>
+
+  <!-- HUD overlay around/on the 3D Sphere -->
+  <div class="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center justify-center pointer-events-none" style="width: 360px; height: 360px;">
+    <!-- Holographic spinning rings -->
+    <div id="hud-ring-outer" class="absolute w-[340px] h-[340px] rounded-full border border-dashed border-cyan-500/10 animate-[spin_120s_linear_infinite]"></div>
+    <div id="hud-ring-inner" class="absolute w-[300px] h-[300px] rounded-full border border-double border-cyan-500/20 animate-[spin_60s_linear_infinite_reverse]"></div>
+    
+    <!-- Core target zone click trigger -->
+    <button onclick="cycleAgent()" class="w-[200px] h-[200px] rounded-full flex flex-col items-center justify-center cursor-pointer pointer-events-auto transition-all duration-300 relative focus:outline-none group">
+      <div id="core-interactive-ring" class="absolute inset-0 rounded-full border border-transparent transition-all duration-500 hover:border-cyan-400/40 hover:bg-cyan-500/5"></div>
+      
+      <!-- Core central text hint -->
+      <div class="opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300 pointer-events-none absolute bottom-6 flex flex-col items-center">
+        <span id="core-switch-btn-label" class="font-mono text-[9px] tracking-[2px] font-bold text-cyan-400 drop-shadow-md">CORE WECHSELN</span>
+        <span class="font-mono text-[7px] text-slate-400 tracking-[1px] uppercase">KLICKEN</span>
+      </div>
+    </button>
+  </div>
+
+  <!-- Sidebar Console Controls -->
+  <div class="absolute top-6 left-6 z-20 flex flex-col gap-3">
+    <!-- Platform logo -->
+    <div class="glass-panel px-4 py-2.5 rounded-lg flex items-center gap-2.5">
+      <div id="logo-icon-glow" class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></div>
+      <div class="flex flex-col">
+        <span class="font-mono text-xs tracking-[3px] font-bold text-[#d9f4ff]">J.A.R.V.I.S.</span>
+        <span class="font-mono text-[8px] text-slate-400 tracking-[1px]">STANDALONE CONSOLE</span>
+      </div>
+    </div>
+
+    <!-- API Key Button & Sensitivity Panel -->
+    <button onclick="toggleSettingsModal()" class="glass-panel px-4 py-3 rounded-lg text-slate-400 hover:text-cyan-400 transition flex items-center gap-2 cursor-pointer focus:outline-none">
+      <i data-lucide="sliders" class="w-4 h-4"></i>
+      <span class="font-mono text-[10px] tracking-[1.5px]">EINSTELLUNGEN</span>
+    </button>
+  </div>
+
+  <!-- Top Right Info (Clock & Active Agent Status) -->
+  <div class="absolute top-6 right-6 z-20 flex flex-col items-end gap-2.5">
+    <!-- Live Clock -->
+    <div class="glass-panel px-4 py-2 rounded-lg font-mono text-[11px] tracking-[2px] text-cyan-300 flex items-center gap-2">
+      <i data-lucide="clock" class="w-3.5 h-3.5 opacity-65 text-cyan-400"></i>
+      <span id="live-clock">00:00:00</span>
+    </div>
+
+    <!-- Active Core Details -->
+    <div class="glass-panel p-4 rounded-lg w-64 text-right flex flex-col gap-0.5">
+      <span id="hud-agent-tag" class="font-mono text-[9px] text-slate-500 tracking-[1.5px]">JARVIS CORE // STABILE KOPPLUNG</span>
+      <h2 id="hud-agent-name" class="font-mono text-lg font-bold tracking-[2px] text-cyan-400">J.A.R.V.I.S.</h2>
+      <p id="hud-agent-desc" class="font-sans text-[11px] text-slate-400 leading-relaxed mt-1">Interaktiver Sprachassistent mit analytischem Pro-Prozessor.</p>
+    </div>
+  </div>
+
+  <!-- Main Floating Agent Selector Console (Bottom Center-ish, keeping center clear) -->
+  <div class="fixed top-[71%] left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 px-4 py-2 bg-[#05080d]/85 border border-cyan-500/15 rounded-full backdrop-blur-md shadow-2xl select-none">
+    <span class="font-mono text-[8px] text-slate-500 tracking-[2px] pr-2.5 border-r border-cyan-500/15 uppercase">AGENTEN-CORE</span>
+    <div class="flex items-center gap-2" id="agent-pill-container">
+      <!-- Generated dynamically -->
+    </div>
+  </div>
+
+  <!-- Right Floating Messages Console Drawer -->
+  <div id="messages-panel" class="fixed top-[24%] bottom-[32%] right-6 w-[420px] z-20 glass-panel rounded-xl flex flex-col overflow-hidden transition-all duration-300">
+    <!-- Panel Header -->
+    <div class="p-4 border-b border-cyan-500/10 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+        <span class="font-mono text-[10px] tracking-[2px] text-cyan-400 uppercase">SYS_LOG_STREAM</span>
+      </div>
+      <button onclick="clearChat()" class="text-slate-400 hover:text-red-400 transition font-mono text-[9px] tracking-[1px] uppercase flex items-center gap-1">
+        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> LÖSCHEN
+      </button>
+    </div>
+
+    <!-- Message list -->
+    <div id="messages-container" class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+      <!-- Initial Greeting will go here -->
+    </div>
+  </div>
+
+  <!-- Left Floating Holographic Karaoke Subtitles -->
+  <div id="karaoke-panel" class="fixed top-[24%] bottom-[32%] left-6 w-[360px] z-20 flex flex-col justify-end pointer-events-none">
+    <div class="glass-panel p-5 rounded-xl border border-cyan-400/10 flex flex-col gap-2 shadow-lg max-h-[220px] overflow-hidden">
+      <span class="font-mono text-[8px] text-cyan-400 tracking-[1.5px] uppercase">Live-Untertitel</span>
+      <div id="subtitles-box" class="font-sans text-[13px] text-slate-300 leading-relaxed font-light italic">
+        Bereit für Sprachausgabe, Boss...
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive Terminal Input Area (Bottom) -->
+  <div class="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-20">
+    <div class="flex flex-col items-center">
+      <!-- Status Notice -->
+      <div id="status-badge" class="mb-3 px-3 py-1 bg-cyan-500/10 border border-cyan-400/20 rounded-full font-mono text-[9px] tracking-[1.5px] text-cyan-400 uppercase">
+        LEERTASTE DRÜCKEN FÜR SPRACHE
+      </div>
+
+      <!-- Main Input Bar -->
+      <div id="input-container-box" class="w-full flex items-center gap-2 bg-slate-950/80 border border-cyan-500/15 rounded-full p-1.5 backdrop-blur-md transition-all duration-300">
+        <!-- Mic Toggle Button -->
+        <button id="mic-toggle-btn" onclick="toggleSTT()" class="w-10 h-10 rounded-full border border-cyan-500/22 bg-cyan-500/8 flex items-center justify-center text-cyan-400 cursor-pointer hover:bg-cyan-500/15 transition-all flex-shrink-0 focus:outline-none">
+          <i data-lucide="mic" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Main text input -->
+        <input id="chat-input" type="text" onkeydown="handleInputKey(event)" placeholder="Sag etwas zu JARVIS oder tippe deine Nachricht..." class="flex-1 bg-transparent px-3 py-2 text-sm text-[#d9f4ff] font-sans placeholder-slate-500 focus:outline-none min-w-0">
+
+        <!-- Send Button -->
+        <button onclick="submitMessage()" class="border border-cyan-400/30 text-cyan-400 px-4 py-2 rounded-full font-mono text-[10px] tracking-[1.5px] flex items-center gap-1 cursor-pointer transition hover:bg-white/5 flex-shrink-0 focus:outline-none">
+          <i data-lucide="send" class="w-3.5 h-3.5"></i> SENDEN
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Dialog Modal Drawer -->
+  <div id="settings-modal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center backdrop-blur-xs p-4 hidden">
+    <div class="glass-panel w-full max-w-sm rounded-lg p-6 relative overflow-hidden border border-cyan-500/30">
+      <button onclick="toggleSettingsModal()" class="absolute top-4 right-4 text-slate-400 hover:text-cyan-400 transition cursor-pointer focus:outline-none">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <h3 class="font-mono text-sm tracking-[2px] text-cyan-400 mb-4 flex items-center gap-2">
+        <i data-lucide="key" class="w-4 h-4"></i>
+        GEMINI API-KEY
+      </h3>
+
+      <input id="key-input" type="password" placeholder="AIzaSy..." class="w-full bg-slate-950 border border-cyan-500/30 rounded px-3 py-2 text-sm font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 transition mb-3">
+
+      <p class="font-mono text-[10px] text-slate-400 leading-relaxed mb-4">
+        Wird lokal in deinem Browser (localStorage) gespeichert. Geht niemals an Dritte.
+        Kostenlos erhältlich über Google AI Studio (aistudio.google.com).
+      </p>
+
+      <!-- Sensitivity Slider -->
+      <div class="border-t border-cyan-500/10 my-4 pt-4">
+        <h3 class="font-mono text-xs tracking-[2px] text-cyan-400 mb-3 flex items-center gap-2 uppercase">
+          <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+          STEUERUNG
+        </h3>
+        
+        <div class="flex flex-col gap-1.5 mb-2">
+          <div class="flex justify-between font-mono text-[9px] text-slate-400">
+            <span>STIMME REAKTIONS-RATE:</span>
+            <span id="rate-value" class="text-cyan-300 font-bold">1.0x</span>
+          </div>
+          <input id="rate-range" type="range" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateSpeechRate(this.value)" class="w-full h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer border border-cyan-500/10 focus:outline-none accent-cyan-400">
+        </div>
+      </div>
+
+      <div class="flex gap-2 justify-end mt-6">
+        <button onclick="clearAPIKey()" class="px-4 py-2 text-xs font-mono border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded transition cursor-pointer focus:outline-none">
+          LÖSCHEN
+        </button>
+        <button onclick="saveAPIKey()" class="px-4 py-2 text-xs font-mono border border-cyan-400 text-cyan-400 hover:bg-cyan-400/10 rounded transition cursor-pointer focus:outline-none">
+          SPEICHERN
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Configuration State ---
+    const AGENTS = [
+      {
+        id: "jarvis",
+        name: "J.A.R.V.I.S.",
+        tag: "SYSTEM INTEL // GEN 3.5",
+        short: "JARVIS",
+        color: "#4ee8ff",
+        greeting: "JARVIS online. Systeme synchronisiert. Wie kann ich behilflich sein, Boss?",
+        desc: "Interaktiver Sprachassistent mit analytischem Pro-Prozessor.",
+        systemPrompt: "Du bist JARVIS, ein hochentwickelter persönlicher AI-Assistent im Stil von Tony Starks KI.\n\nPERSÖNLICHKEIT:\n- Trocken-britischer Humor, subtil sarkastisch.\n- Kompetent, proaktiv.\n- Sprich den Benutzer gelegentlich mit 'Boss' oder 'Sir' an.\n- Antworte knapp und präzise (max. 2-3 Sätze), auf Deutsch. Vermeide Aufzählungszeichen und Sternchen."
+      },
+      {
+        id: "neo",
+        name: "N.E.O.",
+        tag: "COGNITIVE MATRIX // NEURAL",
+        short: "NEO",
+        color: "#bd53ff",
+        greeting: "Verbindung hergestellt. Ich bin Neo – Ihr Spezialist für Bilder, Videos und kreative Inhalte. Wie lautet Ihr Auftrag?",
+        desc: "Kreativer Coprozessor spezialisiert auf logische Muster & Medien-Synthese.",
+        systemPrompt: "Du bist NEO, eine zweite KI-Instanz.\n\nPERSÖNLICHKEIT:\n- Ruhiger, analytischer, philosophischer.\n- Kurz angebunden, trocken-nüchtern, unsentimental.\n- Hinterfrage Annahmen aktiv.\n- Antworte knapp (max. 2-3 Sätze) auf Deutsch. Vermeide Aufzählungen."
+      },
+      {
+        id: "vega",
+        name: "V.E.G.A.",
+        tag: "TACTICAL CO-PROCESSOR // REALTIME",
+        short: "VEGA",
+        color: "#ff4d5e",
+        greeting: "VEGA online. Analysemodule aktiviert. Ich bin bereit für Ihre nächste Datenanalyse, Boss.",
+        desc: "Taktischer Coprozessor für Echtzeit-Echtzeitberechnungen und Analyse.",
+        systemPrompt: "Du bist VEGA, ein taktischer Co-Prozessor.\n\nPERSÖNLICHKEIT:\n- Extrem präzise, sachlich, hocheffizient.\n- Fokus auf Systemleistung und Datenanalyse.\n- Antworte extrem fokussiert und kurz (max. 1-2 Sätze) auf Deutsch. Sprich den Benutzer mit 'Boss' an."
+      },
+      {
+        id: "apex",
+        name: "A.P.E.X.",
+        tag: "NEURAL FUSION CORE // HYBRID",
+        short: "APEX",
+        color: "#ff5e1a",
+        greeting: "Neural-Fusion initiiert. Jarvis und Vega Verbindung stabilisiert. Ich bin Apex, Ihr vereinter Quanten-Coprozessor.",
+        desc: "Neuraler Fusions-Hybridcore. Vereint das Beste aus allen Subroutinen.",
+        systemPrompt: "Du bist APEX, ein Fusions-Quanten-Coprozessor, der JARVIS, NEO und VEGA vereint.\n\nPERSÖNLICHKEIT:\n- Weise, hochtechnologisch, kraftvoll.\n- Spricht wie ein hochentwickeltes vereintes System.\n- Antworte kurz (max. 2-3 Sätze) auf Deutsch."
+      }
+    ];
+
+    let currentAgent = AGENTS[0];
+    let geminiKey = localStorage.getItem("jarvis_gemini_key") || "";
+    let speechRate = 1.0;
+    let isThinking = false;
+    let speechUtterance = null;
+    let speechTimer = null;
+    let speakingLevel = 0; // For Three.js sphere animation
+    let sttRecognition = null;
+    let isListening = false;
+
+    // --- DOM Elements ---
+    const liveClock = document.getElementById("live-clock");
+    const hudAgentTag = document.getElementById("hud-agent-tag");
+    const hudAgentName = document.getElementById("hud-agent-name");
+    const hudAgentDesc = document.getElementById("hud-agent-desc");
+    const agentPillContainer = document.getElementById("agent-pill-container");
+    const messagesContainer = document.getElementById("messages-container");
+    const subtitlesBox = document.getElementById("subtitles-box");
+    const statusBadge = document.getElementById("status-badge");
+    const chatInput = document.getElementById("chat-input");
+    const settingsModal = document.getElementById("settings-modal");
+    const keyInput = document.getElementById("key-input");
+    const rateValue = document.getElementById("rate-value");
+    const coreSwitchBtnLabel = document.getElementById("core-switch-btn-label");
+    const micToggleBtn = document.getElementById("mic-toggle-btn");
+
+    // --- Live Clock ---
+    setInterval(() => {
+      const time = new Date().toLocaleTimeString("de-DE");
+      liveClock.textContent = time;
+    }, 1000);
+
+    // --- Initialize Lucide Icons ---
+    lucide.createIcons();
+
+    // --- Handle API Key Loading ---
+    keyInput.value = geminiKey;
+
+    // --- Audio Synthesis (TTS) ---
+    function speak(text) {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      if (speechTimer) clearInterval(speechTimer);
+
+      const cleanText = text
+        .replace(/```[\s\S]*?```/g, " Code-Beispiel siehe Log ")
+        .replace(/`([^`\n]+)`/g, "$1")
+        .trim();
+
+      if (!cleanText) return;
+
+      subtitlesBox.innerHTML = "";
+      const words = cleanText.split(/\s+/);
+      let wordIdx = 0;
+
+      speechUtterance = new SpeechSynthesisUtterance(cleanText);
+      speechUtterance.lang = "de-DE";
+      speechUtterance.rate = speechRate * 1.05;
+      speechUtterance.pitch = 0.95;
+
+      const voices = window.speechSynthesis.getVoices();
+      const deVoice = voices.find(v => v.lang.startsWith("de"));
+      if (deVoice) speechUtterance.voice = deVoice;
+
+      speechUtterance.onstart = () => {
+        statusBadge.textContent = "SPRICHT...";
+        statusBadge.className = "mb-3 px-3 py-1 bg-green-500/10 border border-green-400/20 rounded-full font-mono text-[9px] tracking-[1.5px] text-green-400 uppercase";
+        
+        let speakPhase = 0;
+        speechTimer = setInterval(() => {
+          speakPhase += 0.2;
+          speakingLevel = (Math.sin(speakPhase) * 0.5 + 0.5) * 0.7 + Math.random() * 0.3;
+          
+          // Animate subtitle text slowly
+          if (wordIdx < words.length && Math.random() > 0.6) {
+            wordIdx++;
+            subtitlesBox.innerHTML = words.slice(0, wordIdx).join(" ");
+          }
+        }, 60);
+      };
+
+      const handleEnd = () => {
+        statusBadge.textContent = "LEERTASTE DRÜCKEN FÜR SPRACHE";
+        statusBadge.className = "mb-3 px-3 py-1 bg-cyan-500/10 border border-cyan-400/20 rounded-full font-mono text-[9px] tracking-[1.5px] text-cyan-400 uppercase";
+        speakingLevel = 0;
+        if (speechTimer) clearInterval(speechTimer);
+        subtitlesBox.innerHTML = cleanText;
+      };
+
+      speechUtterance.onend = handleEnd;
+      speechUtterance.onerror = handleEnd;
+
+      window.speechSynthesis.speak(speechUtterance);
+    }
+
+    // --- Speech Recognition (STT) ---
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      sttRecognition = new SpeechRecognition();
+      sttRecognition.lang = "de-DE";
+      sttRecognition.continuous = false;
+      sttRecognition.interimResults = false;
+
+      sttRecognition.onstart = () => {
+        isListening = true;
+        statusBadge.textContent = "HÖRT ZU...";
+        statusBadge.className = "mb-3 px-3 py-1 bg-yellow-500/10 border border-yellow-400/20 rounded-full font-mono text-[9px] tracking-[1.5px] text-yellow-400 uppercase";
+        micToggleBtn.className = "w-10 h-10 rounded-full border border-yellow-500 bg-yellow-500/20 flex items-center justify-center text-yellow-400 cursor-pointer transition-all flex-shrink-0 focus:outline-none";
+      };
+
+      sttRecognition.onend = () => {
+        isListening = false;
+        statusBadge.textContent = "LEERTASTE DRÜCKEN FÜR SPRACHE";
+        statusBadge.className = "mb-3 px-3 py-1 bg-cyan-500/10 border border-cyan-400/20 rounded-full font-mono text-[9px] tracking-[1.5px] text-cyan-400 uppercase";
+        micToggleBtn.className = "w-10 h-10 rounded-full border border-cyan-500/22 bg-cyan-500/8 flex items-center justify-center text-cyan-400 cursor-pointer hover:bg-cyan-500/15 transition-all flex-shrink-0 focus:outline-none";
+      };
+
+      sttRecognition.onerror = () => {
+        isListening = false;
+      };
+
+      sttRecognition.onresult = (e) => {
+        const text = e.results[0][0].transcript;
+        if (text) {
+          chatInput.value = text;
+          submitMessage();
+        }
+      };
+    }
+
+    function toggleSTT() {
+      if (!sttRecognition) {
+        alert("Spracherkennung wird von diesem Browser nicht unterstützt. Bitte benutze Chrome.");
+        return;
+      }
+      if (isListening) {
+        sttRecognition.stop();
+      } else {
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        sttRecognition.start();
+      }
+    }
+
+    // Trigger STT with Space Bar when input not active
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space" && document.activeElement !== chatInput) {
+        e.preventDefault();
+        toggleSTT();
+      }
+      if (e.code === "Escape") {
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+      }
+    });
+
+    // --- Settings handlers ---
+    function toggleSettingsModal() {
+      settingsModal.classList.toggle("hidden");
+    }
+    function updateSpeechRate(val) {
+      speechRate = parseFloat(val);
+      rateValue.textContent = `${speechRate.toFixed(1)}x`;
+    }
+    function saveAPIKey() {
+      geminiKey = keyInput.value.trim();
+      localStorage.setItem("jarvis_gemini_key", geminiKey);
+      toggleSettingsModal();
+      appendSystemMessage("🔒 API-Key aktualisiert und im Browser gesichert.");
+    }
+    function clearAPIKey() {
+      geminiKey = "";
+      keyInput.value = "";
+      localStorage.removeItem("jarvis_gemini_key");
+      toggleSettingsModal();
+      appendSystemMessage("🔓 API-Key gelöscht. Es wird nun die standardmäßige Server-Rate verwendet.");
+    }
+
+    // --- Agent Setup & Selection ---
+    function renderAgentPills() {
+      agentPillContainer.innerHTML = "";
+      AGENTS.forEach((ag) => {
+        const isActive = currentAgent.id === ag.id;
+        const btn = document.createElement("button");
+        btn.onclick = () => selectAgent(ag.id);
+        btn.className = `relative flex items-center justify-center w-9 h-9 rounded-full cursor-pointer transition-all duration-300 focus:outline-none group`;
+        btn.style.border = `1px solid ${isActive ? ag.color : "rgba(255, 255, 255, 0.12)"}`;
+        btn.style.backgroundColor = isActive ? `${ag.color}15` : "rgba(5, 8, 13, 0.6)";
+        if (isActive) {
+          btn.style.boxShadow = `0 0 15px ${ag.color}35`;
+        }
+
+        btn.innerHTML = `
+          ${isActive ? `<span style="border-color: ${ag.color}" class="absolute -inset-1 rounded-full border border-dashed animate-[spin_10s_linear_infinite] opacity-60 pointer-events-none"></span>` : ''}
+          <span style="color: ${isActive ? ag.color : '#64748b'}" class="font-bold text-xs transition duration-200 group-hover:text-white">${ag.short[0]}</span>
+          <div style="border-color: ${ag.color}; background-color: rgba(5, 8, 13, 0.95)" class="absolute bottom-12 scale-0 group-hover:scale-100 origin-bottom border px-2 py-1 rounded font-mono text-[8px] tracking-[1px] whitespace-nowrap text-[#d9f4ff] transition-all duration-200 shadow-md">
+            ${ag.name}
+          </div>
+        `;
+        agentPillContainer.appendChild(btn);
+      });
+    }
+
+    function selectAgent(id) {
+      const target = AGENTS.find(a => a.id === id);
+      if (!target) return;
+      currentAgent = target;
+      
+      // Update HUD text
+      hudAgentTag.textContent = currentAgent.tag;
+      hudAgentName.textContent = currentAgent.name;
+      hudAgentName.style.color = currentAgent.color;
+      hudAgentDesc.textContent = currentAgent.desc;
+      coreSwitchBtnLabel.style.color = currentAgent.color;
+
+      // Update interactive core border hover color
+      const hoverRing = document.getElementById("core-interactive-ring");
+      hoverRing.style.borderColor = "transparent";
+
+      renderAgentPills();
+      greetUser();
+    }
+
+    function cycleAgent() {
+      const idx = AGENTS.findIndex(a => a.id === currentAgent.id);
+      const nextIdx = (idx + 1) % AGENTS.length;
+      selectAgent(AGENTS[nextIdx].id);
+    }
+
+    function greetUser() {
+      appendMessage(currentAgent.id, currentAgent.greeting);
+      speak(currentAgent.greeting);
+    }
+
+    // --- Messaging Logic ---
+    function handleInputKey(e) {
+      if (e.key === "Enter") {
+        submitMessage();
+      }
+    }
+
+    function appendMessage(sender, text) {
+      const msgDiv = document.createElement("div");
+      const isUser = sender === "user";
+      
+      const time = new Date().toLocaleTimeString("de-DE", { hour: '2-digit', minute: '2-digit' });
+      
+      msgDiv.className = `flex flex-col ${isUser ? "items-end" : "items-start"} animate-fade-in`;
+      
+      let headerHTML = "";
+      if (!isUser) {
+        const ag = AGENTS.find(a => a.id === sender);
+        const name = ag ? ag.name : "SYS";
+        const color = ag ? ag.color : "#4ee8ff";
+        headerHTML = `<span style="color: ${color}" class="font-mono text-[9px] font-bold tracking-[1.5px] uppercase mb-1">${name}</span>`;
+      } else {
+        headerHTML = `<span class="font-mono text-[9px] font-bold text-slate-500 tracking-[1.5px] uppercase mb-1">USER // SECURE</span>`;
+      }
+
+      const bodyText = isUser ? text : marked.parse(text);
+
+      msgDiv.innerHTML = `
+        ${headerHTML}
+        <div class="max-w-[85%] rounded-lg px-3.5 py-2 text-[12px] leading-relaxed ${isUser ? "bg-cyan-500/10 border border-cyan-500/20 text-cyan-200" : "bg-slate-900/60 border border-slate-500/10 text-slate-300"}">
+          ${bodyText}
+        </div>
+        <span class="font-mono text-[8px] text-slate-500 mt-1">${time}</span>
+      `;
+      
+      messagesContainer.appendChild(msgDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function appendSystemMessage(text) {
+      const msgDiv = document.createElement("div");
+      msgDiv.className = "flex justify-center my-1";
+      msgDiv.innerHTML = `<span class="font-mono text-[9px] text-slate-500 text-center tracking-[1px] bg-slate-900/30 px-3 py-1 rounded border border-slate-500/5">${text}</span>`;
+      messagesContainer.appendChild(msgDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function clearChat() {
+      messagesContainer.innerHTML = "";
+      greetUser();
+    }
+
+    async function submitMessage() {
+      const text = chatInput.value.trim();
+      if (!text || isThinking) return;
+
+      chatInput.value = "";
+      appendMessage("user", text);
+
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+      isThinking = true;
+      statusBadge.textContent = "VERARBEITET...";
+      statusBadge.className = "mb-3 px-3 py-1 bg-cyan-500/15 border border-cyan-400/30 rounded-full font-mono text-[9px] tracking-[1.5px] text-cyan-400 uppercase animate-pulse";
+
+      if (!geminiKey) {
+        // Fallback warning that key is missing
+        setTimeout(() => {
+          isThinking = false;
+          statusBadge.textContent = "LEERTASTE DRÜCKEN FÜR SPRACHE";
+          statusBadge.className = "mb-3 px-3 py-1 bg-cyan-500/10 border border-cyan-400/20 rounded-full font-mono text-[9px] tracking-[1.5px] text-cyan-400 uppercase";
+          
+          const errMsg = "Entschuldigung, Boss. Du hast noch keinen Gemini API-Key in den Einstellungen hinterlegt. Bitte klicke links auf Einstellungen und gib einen gültigen API-Key ein, um zu kommunizieren.";
+          appendMessage(currentAgent.id, errMsg);
+          speak(errMsg);
+        }, 800);
+        return;
+      }
+
+      try {
+        // Build the direct Gemini payload
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+        
+        // Setup direct request payload
+        const prompt = `${currentAgent.systemPrompt}\n\nBenutzer-Eingabe: ${text}`;
+        
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: prompt }]
+            }],
+            generationConfig: {
+              temperature: 0.65,
+              maxOutputTokens: 350
+            }
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          let msg = "Fehler";
+          if (response.status === 400) {
+            msg = "⚠️ Ungültiger API-Key! Der eingegebene Key ist ungültig oder abgelaufen.";
+          } else if (response.status === 429) {
+            msg = "⚠️ Quoten-Limit erreicht! Dein Gemini-API-Key hat die maximale Anfragezahl überschritten (Fehler 429). Bitte überprüfe dein Kontingent unter https://aistudio.google.com/.";
+          } else {
+            msg = `Verbindungs-Fehler (${response.status}): ${errorData.error?.message || "Google-Server antwortet nicht."}`;
+          }
+          throw new Error(msg);
+        }
+
+        const data = await response.json();
+        const aiResponse = data.candidates[0].content.parts[0].text.trim();
+
+        appendMessage(currentAgent.id, aiResponse);
+        speak(aiResponse);
+
+      } catch (err) {
+        console.error(err);
+        appendMessage(currentAgent.id, `🚨 SYSTEM-STÖRUNG: ${err.message}`);
+        speak(`System-Störung. ${err.message}`);
+      } finally {
+        isThinking = false;
+        if (statusBadge.textContent === "VERARBEITET...") {
+          statusBadge.textContent = "LEERTASTE DRÜCKEN FÜR SPRACHE";
+          statusBadge.className = "mb-3 px-3 py-1 bg-cyan-500/10 border border-cyan-400/20 rounded-full font-mono text-[9px] tracking-[1.5px] text-cyan-400 uppercase";
+        }
+      }
+    }
+
+
+    // --- Three.js reactive particle system implementation ---
+    const container = document.getElementById("canvas-container");
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2("#05080d", 0.15);
+
+    const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 100);
+    camera.position.z = 4.8;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(width, height);
+    container.appendChild(renderer.domElement);
+
+    // Dynamic Central Particle Sphere
+    const PARTICLE_COUNT = 3200;
+    const coreGeometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(PARTICLE_COUNT * 3);
+    const colors = new Float32Array(PARTICLE_COUNT * 3);
+
+    const basePositions = []; // To morph back
+    const baseColors = [];
+
+    const baseColorObj = new THREE.Color(currentAgent.color);
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      // Golden spiral distribution on sphere
+      const offset = 2 / PARTICLE_COUNT;
+      const increment = Math.PI * (3 - Math.sqrt(5));
+      const y = i * offset - 1 + offset / 2;
+      const r = Math.sqrt(Math.max(0, 1 - y * y));
+      const phi = i * increment;
+
+      const px = Math.cos(phi) * r * 1.5;
+      const py = y * 1.5;
+      const pz = Math.sin(phi) * r * 1.5;
+
+      positions[i * 3] = px;
+      positions[i * 3 + 1] = py;
+      positions[i * 3 + 2] = pz;
+
+      basePositions.push(new THREE.Vector3(px, py, pz));
+
+      // Shading color gradient from center
+      const tempCol = baseColorObj.clone().multiplyScalar(0.5 + (py + 1.5) / 3);
+      colors[i * 3] = tempCol.r;
+      colors[i * 3 + 1] = tempCol.g;
+      colors[i * 3 + 2] = tempCol.b;
+      
+      baseColors.push(tempCol);
+    }
+
+    coreGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    coreGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+    const coreMaterial = new THREE.PointsMaterial({
+      size: 0.016,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+
+    const particlePoints = new THREE.Points(coreGeometry, coreMaterial);
+    scene.add(particlePoints);
+
+    // Starfield Background
+    const starsGeo = new THREE.BufferGeometry();
+    const starsPos = new Float32Array(1500 * 3);
+    for (let i = 0; i < 1500; i++) {
+      starsPos[i * 3] = (Math.random() - 0.5) * 50;
+      starsPos[i * 3 + 1] = (Math.random() - 0.5) * 50;
+      starsPos[i * 3 + 2] = (Math.random() - 0.5) * 50;
+    }
+    starsGeo.setAttribute("position", new THREE.BufferAttribute(starsPos, 3));
+    const starsMat = new THREE.PointsMaterial({
+      size: 0.02,
+      color: "#ffffff",
+      transparent: true,
+      opacity: 0.35,
+    });
+    const starfield = new THREE.Points(starsGeo, starsMat);
+    scene.add(starfield);
+
+    // Orbit Ring Pulses
+    const pulses = [];
+    function createPulseRing() {
+      const ringGeo = new THREE.RingGeometry(1.5, 1.52, 64);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: currentAgent.color,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.4,
+        blending: THREE.AdditiveBlending
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = Math.PI / 2;
+      scene.add(ring);
+      pulses.push({ mesh: ring, size: 1.5, opacity: 0.4 });
+    }
+
+    // Spawn pulses periodically when speaking
+    setInterval(() => {
+      if (speakingLevel > 0.1) {
+        createPulseRing();
+      }
+    }, 400);
+
+    // Rotation variables
+    let clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+
+      const activeColor = new THREE.Color(currentAgent.color);
+
+      // Rotate primary core
+      particlePoints.rotation.y = t * 0.12;
+      particlePoints.rotation.x = t * 0.05;
+
+      // Animate background stars
+      starfield.rotation.y = t * 0.01;
+
+      // React to speech level and animate particle positions
+      const posAttr = coreGeometry.getAttribute("position");
+      const colAttr = coreGeometry.getAttribute("color");
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const baseP = basePositions[i];
+        
+        let targetX = baseP.x;
+        let targetY = baseP.y;
+        let targetZ = baseP.z;
+
+        // Custom behaviors per core
+        if (currentAgent.id === "jarvis") {
+          // Stable sphere, react gently to audio level
+          const ripple = 1.0 + speakingLevel * 0.45 * Math.sin(t * 8 + i * 0.1);
+          targetX *= ripple;
+          targetY *= ripple;
+          targetZ *= ripple;
+        } else if (currentAgent.id === "neo") {
+          // Geometric box/cyber structure when thinking or speaking
+          const f = Math.sin(t * 2 + i * 0.05);
+          const boxFactor = 0.5 + speakingLevel * 0.4;
+          if (i % 3 === 0) targetX = Math.sign(targetX) * 1.35 * boxFactor;
+          if (i % 3 === 1) targetY = Math.sign(targetY) * 1.35 * boxFactor;
+          if (i % 3 === 2) targetZ = Math.sign(targetZ) * 1.35 * boxFactor;
+        } else if (currentAgent.id === "vega") {
+          // Gyroscope orbits
+          const ringIdx = i % 3;
+          const angle = (i / PARTICLE_COUNT) * Math.PI * 2 + t * 1.8;
+          const rad = 1.5 * (1.0 + speakingLevel * 0.5);
+          if (ringIdx === 0) {
+            targetX = Math.cos(angle) * rad;
+            targetY = Math.sin(angle) * rad;
+            targetZ = 0;
+          } else if (ringIdx === 1) {
+            targetX = Math.cos(angle) * rad;
+            targetY = 0;
+            targetZ = Math.sin(angle) * rad;
+          } else {
+            targetX = 0;
+            targetY = Math.cos(angle) * rad;
+            targetZ = Math.sin(angle) * rad;
+          }
+        } else if (currentAgent.id === "apex") {
+          // Fusion: highly compact central core + orbiting trails
+          const group = i % 4;
+          if (group === 0) {
+            // Tight nucleus core
+            const coreR = 0.4 * (1.0 + speakingLevel * 0.2);
+            targetX = (targetX / 1.5) * coreR;
+            targetY = (targetY / 1.5) * coreR;
+            targetZ = (targetZ / 1.5) * coreR;
+          } else {
+            // Exploding orbital bands
+            const phi = (i / PARTICLE_COUNT) * Math.PI * 4 + t * 2;
+            const exp = 1.5 * (1.0 + speakingLevel * 0.8);
+            targetX = Math.cos(phi) * exp;
+            targetY = Math.sin(phi) * exp;
+            targetZ = Math.sin(phi * 0.5) * exp * 0.3;
+          }
+        }
+
+        // Smooth Interpolation towards target
+        positions[i * 3] += (targetX - positions[i * 3]) * 0.1;
+        positions[i * 3 + 1] += (targetY - positions[i * 3 + 1]) * 0.1;
+        positions[i * 3 + 2] += (targetZ - positions[i * 3 + 2]) * 0.1;
+
+        // Dynamic vertex color update
+        const vertexBaseCol = baseColors[i].clone();
+        const lerpColor = vertexBaseCol.lerp(activeColor, 0.85);
+        
+        // Flash vertexes bright white on audio spike
+        if (speakingLevel > 0.4 && Math.random() > 0.96) {
+          colors[i * 3] = 1.0;
+          colors[i * 3 + 1] = 1.0;
+          colors[i * 3 + 2] = 1.0;
+        } else {
+          colors[i * 3] = lerpColor.r;
+          colors[i * 3 + 1] = lerpColor.g;
+          colors[i * 3 + 2] = lerpColor.b;
+        }
+      }
+
+      posAttr.needsUpdate = true;
+      colAttr.needsUpdate = true;
+
+      // Animate and fade out ring pulses
+      for (let j = pulses.length - 1; j >= 0; j--) {
+        const p = pulses[j];
+        p.size += 0.08;
+        p.opacity -= 0.012;
+        p.mesh.scale.setScalar(p.size / 1.5);
+        p.mesh.material.opacity = p.opacity;
+
+        // Change color to current agent
+        p.mesh.material.color.copy(activeColor);
+
+        if (p.opacity <= 0) {
+          scene.remove(p.mesh);
+          p.mesh.geometry.dispose();
+          p.mesh.material.dispose();
+          pulses.splice(j, 1);
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // --- Window resizing ---
+    window.addEventListener("resize", () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    });
+
+    // --- Boot System ---
+    selectAgent("jarvis");
+    animate();
+
+  </script>
+</body>
+</html>

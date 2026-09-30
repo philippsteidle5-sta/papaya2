@@ -1,0 +1,185 @@
+import React from "react";
+import {
+  Sparkles,
+  Zap,
+  Shield,
+  Layers,
+  Crown,
+  AlertTriangle,
+  Flame,
+  CheckCircle2,
+  HelpCircle,
+  Play,
+  ArrowRight,
+  TrendingUp,
+  Brain,
+  Video,
+  Code2,
+  LineChart,
+  Globe,
+  Clock,
+  Compass,
+  Radio,
+} from "lucide-react";
+
+export interface AgentDetails {
+  id: string;
+  name: string;
+  short: string;
+  tagline: string;
+  color: string;
+  glowColor: string;
+  role: string;
+  capabilities: string[];
+  bestFor: string;
+  isBig3?: boolean;
+  costTier: "LOW" | "BALANCED" | "HEAVY";
+}
+
+export const SYSTEM_AGENTS: AgentDetails[] = [
+  {
+    id: "syntax",
+    name: "PAPAYA",
+    short: "PAPAYA",
+    tagline: "PAPAYA OS // SOVEREIGN MASTER BRAIN & ARCHITECT",
+    color: "#ff6b35",
+    glowColor: "rgba(255,107,53,0.75)",
+    role: "Oberstes Master-System, Multi-Agenten-Orchestrierung aller 8 Cores & Enterprise Fullstack-Architektur.",
+    capabilities: [
+      "Vollständige Master-Flottenorchestrierung & Tri-Core Konsens",
+      "Enterprise Fullstack-Software-Architektur & TypeScript-Synthese",
+      "Systemstabilität, API-Design & fehlertolerante Microservices",
+      "Workspace-Sync, Datei-Uploads & automatisierte Workflows",
+    ],
+    bestFor: "Gesamtsteuerung, Systemarchitektur, anspruchsvolle Entwicklungsfragen",
+    isBig3: true,
+    costTier: "BALANCED",
+  },
+  {
+    id: "neo",
+    name: "N.E.O.",
+    short: "NEO",
+    tagline: "OFFER ARCHITECT & REAL-TIME SCREEN CO-PILOT",
+    color: "#ff2a8d",
+    glowColor: "rgba(255,42,141,0.7)",
+    role: "Echtzeit-Bildschirm Co-Pilot, Wachstums-Visionär, $100M-Offers-Framework & proaktive Monitor-Assistenz.",
+    capabilities: [
+      "Echtzeit-Bildschirmanalyse & Video-Stream Context Awareness",
+      "Präzise Fehler-, Code- & UI-Erkennung mit direkten Lösungen",
+      "$100M-Offers (Hormozi Framework) & unwiderstehliches Value-Stacking",
+      "Datenschutz-sensitive Live-Begleitung & proaktive Assistenz",
+    ],
+    bestFor: "Live-Bildschirmbegleitung, Fehleranalyse, Offer-Architektur & Strategie",
+    isBig3: true,
+    costTier: "BALANCED",
+  },
+  {
+    id: "vega",
+    name: "V.E.G.A.",
+    short: "VEGA",
+    tagline: "QUANTUM DATA & PRINCIPAL CODE MATRIX",
+    color: "#ef4444",
+    glowColor: "rgba(239,68,68,0.7)",
+    role: "Principal Software Engineering, Zero-Latency Algorithmen, AST-Refactoring & Datenbank-Audits.",
+    capabilities: [
+      "Senior Staff Code-Audits & AST-basiertes Refactoring",
+      "Zero-Latency Rendering (WebGL / 60 FPS Canvas) & Micro-Benchmarks",
+      "Datenbank-Indizierung, Cache-Invalidierung & Memory-Leak Behebung",
+      "Forensische Logfile- & Stack-Trace-Dekonstruktion",
+    ],
+    bestFor: "Fehlersuche im Code, Performance-Tuning, komplexe Algorithmen",
+    isBig3: true,
+    costTier: "BALANCED",
+  },
+  {
+    id: "odin",
+    name: "O.D.I.N.",
+    short: "ODIN",
+    tagline: "ZERO-TRUST DEFENSE & TACTICAL SECURITY",
+    color: "#e2f1ff",
+    glowColor: "rgba(226,241,255,0.7)",
+    role: "Zero-Trust-Architektur, Penetration-Testing-Standards, OWASP-Audits & Krisen-Reaktionspläne.",
+    capabilities: [
+      "Zero-Trust & OWASP Top 10 Schwachstellen-Scans",
+      "Militärisch-strukturierte Handlungs- und Krisenmatrizen",
+      "API-Security, Token-Leaks-Prüfung & CSRF/XSS-Härtung",
+      "Compliance, DSGVO & Ausfallsicherheits-Architektur",
+    ],
+    bestFor: "Security-Checks, Absicherung von Workflows, Krisenpläne",
+    costTier: "LOW",
+  },
+  {
+    id: "pulse",
+    name: "P.U.L.S.E.",
+    short: "PULSE",
+    tagline: "CREATIVE DIRECTOR, TECHNICAL MOTION DESIGNER & VIRAL ENGINE",
+    color: "#a855f7",
+    glowColor: "rgba(168,85,247,0.7)",
+    role: "Senior Creative Director & Technical Motion Designer für High-End SaaS & AI: Frame-genaue Regieanweisungen für DaVinci/CapCut/After Effects, strikte Trennung von KI-Video (nur organisch) und UI-Post-Production.",
+    capabilities: [
+      "Frame-genaue Schnitt- & Regieanweisungen (Keyframes, Scale-Zooms, Masking)",
+      "Strikte Trennung: KI-Video nur für organische B-Roll, UI nur in Post-Production",
+      "3-Sekunden-Psychologie (Visual Hook, Audio Hook & Text-on-Screen Formeln)",
+      "Shot-by-Shot Drehbücher mit Pacing & Retention-Loops (Watch Time >85%)",
+      "Veo 3.1 & Frameloop Cinematic Prompts (reine 3D/Atmosphäre ohne UI)",
+      "Psychologisches Copywriting mit Micro-Commitment CTAs & Captions",
+      "Paid Social Ad-Frameworks (Meta / TikTok Spark Ads) mit ROAS-Fokus",
+    ],
+    bestFor: "SaaS-Trailer, Schnitt-Regieanweisungen, Social Media Kampagnen, virale Skripte",
+    costTier: "LOW",
+  },
+  {
+    id: "chronos",
+    name: "C.H.R.O.N.O.S.",
+    tagline: "TEMPORAL MATRIX & SPRINT EXECUTION CORE",
+    short: "CHRONOS",
+    color: "#eab308",
+    glowColor: "rgba(234,179,8,0.7)",
+    role: "Radikales Timeboxing, Deep Work Blöcke, Sprint-Milestones & Beseitigung von Zeitdieben.",
+    capabilities: [
+      "Radikales Timeboxing & strukturierte Deep-Work-Sprintblöcke",
+      "Milestone- & Roadmap-Planung mit Zeitkomprimierung",
+      "Automatisierte Priorisierung nach Eisenhower & Pareto-Prinzip",
+      "Eliminierung von Prozess-Leerlauf und Produktivitäts-Engpässen",
+    ],
+    bestFor: "Projektmanagement, Zeitpläne, Sprint-Planung, Produktivität",
+    costTier: "LOW",
+  },
+  {
+    id: "oracle",
+    name: "O.R.A.C.L.E.",
+    short: "ORACLE",
+    tagline: "SAAS UNIT ECONOMICS & FINANCIAL MATRIX",
+    color: "#22c55e",
+    glowColor: "rgba(34,197,94,0.7)",
+    role: "SaaS Unit Economics (LTV/CAC, Churn, Payback), Candlestick-Muster, Krypto/DeFi & quantitative Risikokalkulation.",
+    capabilities: [
+      "SaaS Unit Economics Modellierung (LTV, CAC, Churn, Payback)",
+      "Technische Candlestick- & Orderblock-Liquiditätsanalysen",
+      "Krypto-Tokenomics, DeFi-Liquidität & Trend-Szenarien",
+      "Quantitative Kosten-Nutzen- & Monetarisierungs-Prüfungen",
+    ],
+    bestFor: "Markt-Scans, Chartanalysen, Finanzrecherchen, SaaS-Metriken",
+    costTier: "LOW",
+  },
+  {
+    id: "globe",
+    name: "G.L.O.B.E.",
+    short: "GLOBE",
+    tagline: "QUAD-CORE DEEP SEARCH & OSIRIS AI LIVE RADAR",
+    color: "#3b82f6",
+    glowColor: "rgba(59,130,246,0.7)",
+    role: "Echtzeit-Web-Radar, Blue-Ocean-Lücken, Wettbewerber-Audits & OSIRIS AI Open-Source Flight Radar (osirisai.live API).",
+    capabilities: [
+      "OSIRIS AI Live Flight Radar & OSINT (osirisai.live Integration)",
+      "Bash-Skript Exec: curl -s https://osirisai.live/api/flights | jq '.commercial_flights | length'",
+      "Kommerzielle & militärische globale Flugverfolgung in Echtzeit",
+      "Echtzeit-Web-Crawler & Google Search Fusion",
+      "Wettbewerber-Audits, Produktvergleiche & Blue-Ocean-Analysen",
+      "Quellenbasierte Faktenprüfung, Zitate & Marktdaten-Abgleich",
+      "Globale Industrie-Trends, Preisüberwachung & News-Screening",
+    ],
+    bestFor: "Live-Flug- & OSINT-Radar (Admin), Markt-Scans, Wettbewerbsanalysen, globale Recherche",
+    costTier: "LOW",
+  },
+];

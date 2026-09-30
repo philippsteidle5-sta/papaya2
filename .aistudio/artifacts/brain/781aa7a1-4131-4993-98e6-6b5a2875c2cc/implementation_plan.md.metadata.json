@@ -1,0 +1,6 @@
+{
+  "summary":  "Architekturplan zur nahtlosen Integration des sauberen All-in-One Kalenders in das Focus Canvas (MultiAssistantCanvas & Focus Mode). Beinhaltet Dock-Trigger, schwebendes Glassmorphism-Karten-Overlay, geteilten Event-Status und Direktzugriff in Fokus-Sessions.",
+  "updatedAt":  "2026-09-27T22:15:07.253727401Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}
