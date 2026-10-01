@@ -42,6 +42,7 @@ export interface ActiveWidgetsConfig {
   jarvisTrader: boolean;
   weatherWidget?: boolean;
   calendarWidget?: boolean;
+  goalsWidget?: boolean;
   dailyObjectives?: boolean;
   agentDock?: boolean;
 }
@@ -167,8 +168,8 @@ export const WorkspaceLayoutEditor: React.FC<WorkspaceLayoutEditorProps> = ({
                   { key: "gmailInbox", label: "Gmail Posteingang & KI-Mails", icon: Mail },
                   { key: "socialUpload", label: "Social Media Studio (TikTok, IG, X)", icon: Zap },
                   { key: "calendarWidget", label: "Google Calendar & Chronos Termine", icon: CalendarDays },
+                  { key: "goalsWidget", label: "Papaya Goals & Habit Tracker", icon: Target },
                   { key: "agentDock", label: "Agenten Dock // 9-Core Bar", icon: Sparkles },
-                  { key: "dailyObjectives", label: "Tagesziele // 3 Kernfokusse", icon: Target },
                   { key: "weatherWidget", label: "Standort Wetter Radar", icon: CloudSun },
                   { key: "webBrowser", label: "Quantum Web Browser", icon: Globe },
                   { key: "appStore", label: "S.Y.N.T.A.X. App Store Hub", icon: Zap },

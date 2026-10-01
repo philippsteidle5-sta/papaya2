@@ -75,7 +75,12 @@ import { DraggableResizableWidget } from "./components/DraggableResizableWidget"
 import { FastChatInputBar } from "./components/FastChatInputBar";
 import { LiveSpeechSubtitlesOverlay } from "./components/LiveSpeechSubtitlesOverlay";
 import { ChronosCalendarWidget } from "./components/ChronosCalendarWidget";
-import { DailyObjectivesWidget, getDailyObjectivesFormattedSummary } from "./components/DailyObjectivesWidget";
+import { PapayaGoalsWidget } from "./components/PapayaGoalsWidget";
+import {
+  createGoalFromAgent,
+  detectGoalsCommandFromMessage,
+  getGoalsSummaryForSparring,
+} from "./utils/papayaGoalsService";
 import { applyAgentVoice, normalizeTextForSpeech, calculateWordTimestamps, calculateWordOffsets, WordOffset, AGENT_VOICE_PROFILES, splitTextIntoSpeechChunks } from "./utils/voiceUtils";
 import { VeoVideoStudio } from "./components/VeoVideoStudio";
 import { CyberpunkLandingPage } from "./components/CyberpunkLandingPage";
@@ -102,6 +107,7 @@ import {
   getPersistentMemoryContextForPrompt,
   getPersistentMemory,
   subscribeToMemory,
+  clearAllMemory,
   PersistentMemoryState,
 } from "./utils/persistentMemoryStore";
 import {
@@ -349,13 +355,13 @@ export default function App() {
         if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {}
-    // By default, Gemini, Chronos Calendar and Google Maps are installed out-of-the-box
-    return ["gemini", "calendar", "maps"];
+    // By default, Gemini, Chronos Calendar, Google Maps and Papaya Goals are installed out-of-the-box
+    return ["gemini", "calendar", "maps", "goals"];
   });
 
   const handleToggleInstallPlugin = (pluginId: string) => {
     setInstalledPluginIds((prev) => {
-      const currentList = Array.isArray(prev) ? prev : ["gemini", "calendar", "maps"];
+      const currentList = Array.isArray(prev) ? prev : ["gemini", "calendar", "maps", "goals"];
       const exists = currentList.includes(pluginId);
       const next = exists ? currentList.filter((id) => id !== pluginId) : [...currentList, pluginId];
       try {
@@ -370,6 +376,10 @@ export default function App() {
       if (exists && (pluginId === "maps" || pluginId === "googleMaps")) {
         setActiveWidgets((w) => ({ ...w, googleMaps: false }));
       }
+      // If goals was uninstalled, close its open widget
+      if (exists && (pluginId === "goals" || pluginId === "papayaGoals")) {
+        setActiveWidgets((w) => ({ ...w, goalsWidget: false }));
+      }
       return next;
     });
   };
@@ -378,6 +388,9 @@ export default function App() {
   const isCalendarInstalled = Boolean(Array.isArray(installedPluginIds) && installedPluginIds.includes("calendar"));
   const isGoogleMapsInstalled = Boolean(
     Array.isArray(installedPluginIds) && (installedPluginIds.includes("maps") || installedPluginIds.includes("googleMaps"))
+  );
+  const isGoalsInstalled = Boolean(
+    Array.isArray(installedPluginIds) && (installedPluginIds.includes("goals") || installedPluginIds.includes("papayaGoals"))
   );
 
   // --- MULTI-AGENT COMMUNICATION SCOPE STATE & MODALS ---
@@ -419,7 +432,43 @@ export default function App() {
     addSystemLog("👑 THE BIG 3 (SYNTAX, NEO, VEGA) Tri-Core Matrix synchronisiert.", "agent", "S.Y.N.T.A.X.");
   };
 
-  // --- AGENT-SYNC & MULTI-AGENT VOICE CONFERENCE MODALS ---
+  // Complete Reset of Brain, Memories, Prompts & History to 0 for Testing
+  const handleResetBrainToZero = () => {
+    try {
+      clearAllMemory();
+      localStorage.removeItem("syntax_agent_persistent_memory_v1");
+      localStorage.removeItem("jarvis_agent_chats_v2");
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (
+          k &&
+          (k.startsWith("syntax_query_logs_v1_") ||
+            k.includes("memory") ||
+            k.includes("prompts") ||
+            k.includes("sim_messages") ||
+            k.includes("agent_chats"))
+        ) {
+          localStorage.removeItem(k);
+        }
+      }
+      setAgentChats({});
+      setMessages([]);
+      addSystemLog("Brain & Gedächtnis vollständig auf 0 zurückgesetzt.", "success");
+    } catch (e) {
+      console.warn("Error resetting brain", e);
+    }
+  };
+
+  // Auto-reset brain and clear invented prompts for clean testing
+  useEffect(() => {
+    const hasReset = localStorage.getItem("syntax_brain_cleansed_v1");
+    if (!hasReset) {
+      handleResetBrainToZero();
+      try {
+        localStorage.setItem("syntax_brain_cleansed_v1", "true");
+      } catch (e) {}
+    }
+  }, []);
   const [isAgentSyncModalOpen, setIsAgentSyncModalOpen] = useState(false);
   const [activeAgentSyncSynthesis, setActiveAgentSyncSynthesis] = useState<AgentSyncSynthesis | null>(null);
   const [isVoiceConferenceModalOpen, setIsVoiceConferenceModalOpen] = useState(false);
@@ -601,7 +650,9 @@ export default function App() {
         setActiveWidgets((prev) => ({ ...prev, claudeCode: true }));
         break;
       case "dailyObjectives":
-        setActiveWidgets((prev) => ({ ...prev, dailyObjectives: true }));
+      case "goals":
+      case "goalsWidget":
+        setActiveWidgets((prev) => ({ ...prev, goalsWidget: true }));
         break;
       case "googleMaps":
         setActiveWidgets((prev) => ({ ...prev, googleMaps: true }));
@@ -1016,6 +1067,7 @@ export default function App() {
     jarvisTrader: false,
     weatherWidget: false,
     calendarWidget: false,
+    goalsWidget: false,
     dailyObjectives: false,
     agentDock: true,
   };
@@ -1026,7 +1078,7 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          return { ...DEFAULT_ACTIVE_WIDGETS, ...parsed };
+          return { ...DEFAULT_ACTIVE_WIDGETS, ...parsed, dailyObjectives: false };
         }
       }
     } catch (e) {
@@ -1481,27 +1533,6 @@ export default function App() {
     return null;
   };
 
-  // NLP Daily Objectives Intent Parser: recognizes inquiries about goals, tasks, priorities and commands to open the widget
-  const detectObjectivesRequestFromMessage = (text: string): { isRequest: boolean; isClose?: boolean; onlyListTitles?: boolean } | null => {
-    if (!text) return null;
-    const clean = text.trim();
-
-    if (/(?:tagesziele?|ziele?|daily\s*objectives?)\s*(?:schließen|schliessen|ausblenden|beenden|zu|weg|schließe|schliesse)|schließe\s*(?:die\s*)?(?:tagesziele?|ziele?|objectives?)|close\s*objectives/i.test(clean)) {
-      return { isRequest: true, isClose: true };
-    }
-
-    const isGoalKeyword = /(?:ziele?|tagesziele?|objectives?|goals?|tagesaufgaben?|aufgaben?|fokus|tagesfokus)/i.test(clean);
-    const isActionOrQuestion = /(?:nenn|sag|zeig|list|vorles|öffn|schau|welch|was|hast|hab|gib|view|show|open|read|tell|get|alle|nur|steh|welche|was\s+sind|bitte)/i.test(clean);
-
-    const isGoalQuery = /(?:was\s+sind\s+(?:meine\s+)?(?:tages)?ziele|meine\s+tagesziele|meine\s+ziele|zeige?\s+(?:mir\s+)?(?:meine\s+)?(?:tages)?ziele|welche\s+tagesziele\s+habe\s+ich|welche\s+ziele\s+habe\s+ich|was\s+steht\s+(?:heute\s+)?an|liste\s+(?:meine\s+)?(?:tages)?ziele\s+auf|welche\s+aufgaben\s+habe\s+ich\s+heute|was\s+muss\s+ich\s+heute\s+(?:noch\s+)?tun|tagesziele\s+(?:nennen|vorlesen|zeigen|auflisten|sagen)|öffne?\s+(?:meine\s+)?(?:tagesziele?|ziele?|daily\s*objectives)|tagesziele\s+öffnen|tagesziele\s+anzeigen|what\s+are\s+my\s+(?:daily\s+)?objectives|what\s+are\s+my\s+goals|show\s+(?:my\s+)?objectives|list\s+(?:my\s+)?goals|open\s+(?:daily\s+)?objectives|ziele\s+die\s+da\s+stehen|nur\s+alle\s+ziele|nur\s+die\s+ziele)/i.test(clean) || (isGoalKeyword && isActionOrQuestion);
-
-    if (isGoalQuery) {
-      const isOnlyTitles = /(?:nur\s+(?:die\s+|alle\s+)?ziele|ohne\s+kategorie|ohne\s+gar\s+nichts|nur\s+alle\s+ziele|kurz\s+die\s+ziele|just\s+the\s+goals|titles\s+only|schnell|nur\s+wissen)/i.test(clean);
-      return { isRequest: true, isClose: false, onlyListTitles: isOnlyTitles };
-    }
-    return null;
-  };
-
   // NLP Direct App Open Router (e.g. "öffne kalender", "öffne veo", "öffne terminal", "öffne app store", etc.)
   const detectAppOpenRequestFromMessage = (text: string): { 
     widgetKey?: keyof ActiveWidgetsConfig; 
@@ -1515,6 +1546,11 @@ export default function App() {
     // App Store / App Hub
     if (/(?:öffne?|starte?|zeige?|open|launch)\s+(?:den\s+|das\s+)?(?:app\s*store|app\s*hub|app\s*matrix|apps)|(?:app\s*store|app\s*hub)\s+(?:öffnen|starten|anzeigen)/i.test(clean)) {
       return { widgetKey: "appStore", appName: "App Matrix & App Store Hub", appNameEn: "App Matrix & Store Hub" };
+    }
+
+    // Papaya Goals & Habits
+    if (/(?:öffne?|starte?|zeige?|open|launch)\s+(?:den\s+|das\s+|meinen\s+)?(?:goals?|ziele?|tagesziele?|wochenziele?|habit\s*tracker|ziel-tracker)|(?:goals?|ziele?|tagesziele?)\s+(?:öffnen|starten)/i.test(clean)) {
+      return { widgetKey: "goalsWidget", appName: "Papaya Goals & Habit Tracker", appNameEn: "Papaya Goals & Habit Tracker" };
     }
 
     // Chronos Calendar / Schedule
@@ -2983,6 +3019,28 @@ export default function App() {
 
     // In multi-agent "ALL" mode or NEO SPEAK MODUS, NEVER hijack with local popups - send straight to the AI agent cores
     if (effectiveScope !== "ALL" && !isNeoVoiceMode) {
+      // -1. Direct Voice / Command: Brain Reset & Purge ("reset brain", "gedächtnis auf 0", "alle prompts raus", "reset gedächtnis")
+      if (/(?:reset\s+(?:das\s+)?brain|brain\s+(?:auf\s+0|resetten?|zurücksetzen?)|gedächtnis\s+(?:auf\s+0|löschen|leeren|resetten?)|alle\s+prompts\s+(?:raus|löschen))/i.test(text.trim())) {
+        handleResetBrainToZero();
+        const resetAck = lang === "en"
+          ? "✓ Brain & memory reset to 0! All invented prompts, facts, and chat histories have been purged. The system is completely neutral and ready for your tests."
+          : "✓ Brain & Gedächtnis auf 0 zurückgesetzt! Alle erfundenen Prompts, Fakten und Chatverläufe wurden restlos gelöscht. Das System ist nun vollkommen neutral für deine Tests bereit.";
+        const assistantMsg: Message = {
+          id: `msg-${Date.now() + 1}`,
+          role: agentId as Message["role"],
+          content: resetAck,
+          timestamp: new Date().toLocaleTimeString("de-DE"),
+        };
+        setAgentChats((prev) => ({ ...prev, [agentId]: [assistantMsg] }));
+        if (agentId === currentAgent.id) {
+          setMessages([assistantMsg]);
+        }
+        if (!shouldBeSilent) {
+          speak(resetAck, agentId);
+        }
+        return;
+      }
+
       // 0. Direct Voice / Command: Google Calendar Intent Handling (e.g. "mache einen termin am 29.09 um 10 uhr", "termin im kalender eintragen", "welche termine habe ich")
       const calCmd = extractCalendarCommand(text);
       if (calCmd && calCmd.isCalendarAction) {
@@ -3204,14 +3262,12 @@ export default function App() {
         }
       }
 
-      // 3. Direct Voice / Command: Daily Objectives Intent Handling ("was sind meine tagesziele", "zeige meine ziele", "tagesziele öffnen")
-      const objectivesRes = detectObjectivesRequestFromMessage(text);
-      if (objectivesRes) {
-        if (objectivesRes.isClose) {
-          setActiveWidgets((prev) => ({ ...prev, dailyObjectives: false }));
-          const closeResp = lang === "en"
-            ? "Daily Objectives HUD closed, Mr."
-            : "Die Tagesziele-Übersicht wurde geschlossen, Mr.";
+      // 2.8. Direct Voice / Command: Papaya Goals Intent Handling ("erstelle mir ein wochenziel für den launch mit 4 teilschritten", "ziele öffnen", "sparring zu meinen zielen")
+      const goalsCmd = detectGoalsCommandFromMessage(text);
+      if (goalsCmd) {
+        if (goalsCmd.action === "close") {
+          setActiveWidgets((prev) => ({ ...prev, goalsWidget: false }));
+          const closeResp = lang === "en" ? "Papaya Goals closed, Mr." : "Papaya Goals wurde geschlossen, Mr.";
           const assistantMsg: Message = {
             id: `msg-${Date.now() + 1}`,
             role: agentId as Message["role"],
@@ -3225,25 +3281,21 @@ export default function App() {
             persistAgentChats(nextMap);
             return nextMap;
           });
-          if (agentId === currentAgent.id) {
-            setMessages((prev) => [...prev, assistantMsg]);
-          }
-          if (!shouldBeSilent) {
-            speak(closeResp, agentId);
-          }
+          if (agentId === currentAgent.id) setMessages((prev) => [...prev, assistantMsg]);
+          if (!shouldBeSilent) speak(closeResp, agentId);
           return;
-        } else {
-          // Open the Daily Objectives widget immediately
-          setActiveWidgets((prev) => ({ ...prev, dailyObjectives: true }));
-          const summaryData = getDailyObjectivesFormattedSummary(userProfile?.email, lang === "en", !!objectivesRes.onlyListTitles);
-
+        } else if (goalsCmd.action === "open") {
+          setActiveWidgets((prev) => ({ ...prev, goalsWidget: true }));
+          const summary = getGoalsSummaryForSparring(lang);
+          const openResp = lang === "en"
+            ? `✓ I have opened your Papaya Goals & Habit Tracker HUD, Mr.\n\n${summary}\nWhich goal or habit do you want to focus on today?`
+            : `✓ Ich habe dein Papaya Goals & Habit Tracker HUD geöffnet, Mr.\n\n${summary}\nAuf welches Ziel oder welche Gewohnheit möchtest du deinen Fokus heute richten?`;
           const assistantMsg: Message = {
             id: `msg-${Date.now() + 1}`,
             role: agentId as Message["role"],
-            content: summaryData.summaryText,
+            content: openResp,
             timestamp: new Date().toLocaleTimeString("de-DE"),
           };
-
           setAgentChats((prev) => {
             const existing = prev[agentId] || [];
             const updated = [...existing, assistantMsg];
@@ -3251,13 +3303,69 @@ export default function App() {
             persistAgentChats(nextMap);
             return nextMap;
           });
-          if (agentId === currentAgent.id) {
-            setMessages((prev) => [...prev, assistantMsg]);
-          }
-          if (!shouldBeSilent) {
-            speak(summaryData.summaryText, agentId);
-          }
+          if (agentId === currentAgent.id) setMessages((prev) => [...prev, assistantMsg]);
+          if (!shouldBeSilent) speak(openResp, agentId);
           return;
+        } else if (goalsCmd.action === "create" && goalsCmd.title) {
+          const createdGoal = createGoalFromAgent({
+            title: goalsCmd.title,
+            per: goalsCmd.per,
+            subtasks: goalsCmd.subtasks,
+          });
+          setActiveWidgets((prev) => ({ ...prev, goalsWidget: true }));
+
+          const perLabel =
+            goalsCmd.per === "w"
+              ? lang === "en" ? "Weekly Goal" : "Wochenziel"
+              : goalsCmd.per === "m"
+              ? lang === "en" ? "Monthly Goal" : "Monatsziel"
+              : goalsCmd.per === "y"
+              ? lang === "en" ? "Annual Goal" : "Jahresziel"
+              : lang === "en" ? "Daily Goal" : "Tagesziel";
+
+          let createResp =
+            lang === "en"
+              ? `🎯 Done, Mr.! I have added your ${perLabel} "${createdGoal.title}" directly to Papaya Goals.`
+              : `🎯 Erledigt, Mr.! Ich habe dein ${perLabel} "${createdGoal.title}" direkt in Papaya Goals eingebucht.`;
+
+          if (createdGoal.sub && createdGoal.sub.length > 0) {
+            createResp +=
+              lang === "en"
+                ? `\n\nGenerated sub-steps:\n`
+                : `\n\nStrukturierte Teilschritte:\n`;
+            createdGoal.sub.forEach((s, idx) => {
+              createResp += `  ${idx + 1}. [ ] ${s.t}\n`;
+            });
+            createResp +=
+              lang === "en"
+                ? `\nHow do you want to tackle step 1?`
+                : `\nWie möchtest du Teilschritt 1 angehen?`;
+          } else {
+            createResp +=
+              lang === "en"
+                ? `\nShould I break down this goal into actionable sub-steps for you?`
+                : `\nSoll ich dieses Ziel in konkrete Teilschritte für dich aufschlüsseln?`;
+          }
+
+          const assistantMsg: Message = {
+            id: `msg-${Date.now() + 1}`,
+            role: agentId as Message["role"],
+            content: createResp,
+            timestamp: new Date().toLocaleTimeString("de-DE"),
+          };
+          setAgentChats((prev) => {
+            const existing = prev[agentId] || [];
+            const updated = [...existing, assistantMsg];
+            const nextMap = { ...prev, [agentId]: updated };
+            persistAgentChats(nextMap);
+            return nextMap;
+          });
+          if (agentId === currentAgent.id) setMessages((prev) => [...prev, assistantMsg]);
+          if (!shouldBeSilent) speak(createResp, agentId);
+          return;
+        } else if (goalsCmd.action === "discuss") {
+          setActiveWidgets((prev) => ({ ...prev, goalsWidget: true }));
+          // Fall through to AI conversation with goals summary attached
         }
       }
 
@@ -3303,7 +3411,7 @@ export default function App() {
       : text;
 
     // Get live daily goals summary to sync with AI models
-    const liveObjectivesSummary = getDailyObjectivesFormattedSummary(userProfile?.email, lang === "en");
+    const liveObjectivesSummary = getGoalsSummaryForSparring(lang);
 
     // Infallible persistent memory extraction from user text
     extractAndSaveMemoryFromUserText(text, agentId);
@@ -3335,7 +3443,7 @@ export default function App() {
           video: firstVideo || undefined,
           videos: videoUrls.length > 0 ? videoUrls : undefined,
           scope: effectiveScope,
-          dailyObjectives: liveObjectivesSummary.summaryText,
+          dailyObjectives: liveObjectivesSummary,
           clientDateStr: new Date().toLocaleDateString("de-DE", { weekday: "long", year: "numeric", month: "long", day: "numeric" }),
           memoryContext,
           userMemory,
@@ -3511,6 +3619,29 @@ export default function App() {
 
     // In multi-agent "ALL" mode, NEVER hijack with local popups - send straight to the 8 AI agent cores
     if (communicationScope !== "ALL") {
+      // 0. Direct Voice / Command: Brain Reset & Purge ("reset brain", "gedächtnis auf 0", "alle prompts raus", "reset gedächtnis")
+      if (/(?:reset\s+(?:das\s+)?brain|brain\s+(?:auf\s+0|resetten?|zurücksetzen?)|gedächtnis\s+(?:auf\s+0|löschen|leeren|resetten?)|alle\s+prompts\s+(?:raus|löschen))/i.test(rawMessage.trim())) {
+        handleResetBrainToZero();
+        const resetAck = lang === "en"
+          ? "✓ Brain & memory reset to 0! All invented prompts, facts, and chat histories have been purged. The system is completely neutral and ready for your tests."
+          : "✓ Brain & Gedächtnis auf 0 zurückgesetzt! Alle erfundenen Prompts, Fakten und Chatverläufe wurden restlos gelöscht. Das System ist nun vollkommen neutral für deine Tests bereit.";
+        const userMsg: Message = {
+          id: `msg-${Date.now()}`,
+          role: "user",
+          content: rawMessage,
+          timestamp: new Date().toLocaleTimeString("de-DE"),
+        };
+        const assistantMsg: Message = {
+          id: `msg-${Date.now() + 1}`,
+          role: currentAgent.id,
+          content: resetAck,
+          timestamp: new Date().toLocaleTimeString("de-DE"),
+        };
+        updateMessages(() => [userMsg, assistantMsg]);
+        speak(resetAck, currentAgent.id);
+        return;
+      }
+
       // 1. Direct Voice / Command: Explicit Gmail Intent Handling
       const isGmailReq = detectGmailRequestFromMessage(rawMessage);
 
@@ -3623,20 +3754,18 @@ export default function App() {
         }
       }
 
-      // 3. Direct Voice / Command: Explicit Daily Objectives Intent Handling
-      const objectivesRes = detectObjectivesRequestFromMessage(rawMessage);
-      if (objectivesRes) {
-        if (objectivesRes.isClose) {
-          setActiveWidgets((prev) => ({ ...prev, dailyObjectives: false }));
+      // 3. Direct Voice / Command: Explicit Papaya Goals Intent Handling
+      const goalsCmd = detectGoalsCommandFromMessage(rawMessage);
+      if (goalsCmd) {
+        if (goalsCmd.action === "close") {
+          setActiveWidgets((prev) => ({ ...prev, goalsWidget: false }));
           const userMsg: Message = {
             id: `msg-${Date.now()}`,
             role: "user",
             content: rawMessage,
             timestamp: new Date().toLocaleTimeString("de-DE"),
           };
-          const closeResp = lang === "en"
-            ? "Daily Objectives HUD closed, Mr."
-            : "Die Tagesziele-Übersicht wurde geschlossen, Mr.";
+          const closeResp = lang === "en" ? "Papaya Goals closed, Mr." : "Papaya Goals wurde geschlossen, Mr.";
           const assistantMsg: Message = {
             id: `msg-${Date.now() + 1}`,
             role: currentAgent.id,
@@ -3646,24 +3775,76 @@ export default function App() {
           updateMessages((prev) => [...prev, userMsg, assistantMsg]);
           speak(closeResp, currentAgent.id);
           return;
-        } else {
-          setActiveWidgets((prev) => ({ ...prev, dailyObjectives: true }));
-          const summaryData = getDailyObjectivesFormattedSummary(userProfile?.email, lang === "en", !!objectivesRes.onlyListTitles);
-
+        } else if (goalsCmd.action === "open") {
+          setActiveWidgets((prev) => ({ ...prev, goalsWidget: true }));
+          const summary = getGoalsSummaryForSparring(lang);
           const userMsg: Message = {
             id: `msg-${Date.now()}`,
             role: "user",
             content: rawMessage,
             timestamp: new Date().toLocaleTimeString("de-DE"),
           };
+          const openResp =
+            lang === "en"
+              ? `✓ I have opened your Papaya Goals & Habit Tracker HUD, Mr.\n\n${summary}\nWhich goal or habit do you want to focus on today?`
+              : `✓ Ich habe dein Papaya Goals & Habit Tracker HUD geöffnet, Mr.\n\n${summary}\nAuf welches Ziel oder welche Gewohnheit möchtest du deinen Fokus heute richten?`;
           const assistantMsg: Message = {
             id: `msg-${Date.now() + 1}`,
             role: currentAgent.id,
-            content: summaryData.summaryText,
+            content: openResp,
             timestamp: new Date().toLocaleTimeString("de-DE"),
           };
           updateMessages((prev) => [...prev, userMsg, assistantMsg]);
-          speak(summaryData.summaryText, currentAgent.id);
+          speak(openResp, currentAgent.id);
+          return;
+        } else if (goalsCmd.action === "create" && goalsCmd.title) {
+          const createdGoal = createGoalFromAgent({
+            title: goalsCmd.title,
+            per: goalsCmd.per,
+            subtasks: goalsCmd.subtasks,
+          });
+          setActiveWidgets((prev) => ({ ...prev, goalsWidget: true }));
+          const userMsg: Message = {
+            id: `msg-${Date.now()}`,
+            role: "user",
+            content: rawMessage,
+            timestamp: new Date().toLocaleTimeString("de-DE"),
+          };
+          const perLabel =
+            goalsCmd.per === "w"
+              ? lang === "en" ? "Weekly Goal" : "Wochenziel"
+              : goalsCmd.per === "m"
+              ? lang === "en" ? "Monthly Goal" : "Monatsziel"
+              : goalsCmd.per === "y"
+              ? lang === "en" ? "Annual Goal" : "Jahresziel"
+              : lang === "en" ? "Daily Goal" : "Tagesziel";
+
+          let createResp =
+            lang === "en"
+              ? `🎯 Done, Mr.! I have added your ${perLabel} "${createdGoal.title}" directly to Papaya Goals.`
+              : `🎯 Erledigt, Mr.! Ich habe dein ${perLabel} "${createdGoal.title}" direkt in Papaya Goals eingebucht.`;
+
+          if (createdGoal.sub && createdGoal.sub.length > 0) {
+            createResp +=
+              lang === "en"
+                ? `\n\nGenerated sub-steps:\n`
+                : `\n\nStrukturierte Teilschritte:\n`;
+            createdGoal.sub.forEach((s, idx) => {
+              createResp += `  ${idx + 1}. [ ] ${s.t}\n`;
+            });
+            createResp +=
+              lang === "en"
+                ? `\nHow do you want to tackle step 1?`
+                : `\nWie möchtest du Teilschritt 1 angehen?`;
+          }
+          const assistantMsg: Message = {
+            id: `msg-${Date.now() + 1}`,
+            role: currentAgent.id,
+            content: createResp,
+            timestamp: new Date().toLocaleTimeString("de-DE"),
+          };
+          updateMessages((prev) => [...prev, userMsg, assistantMsg]);
+          speak(createResp, currentAgent.id);
           return;
         }
       }
@@ -3842,7 +4023,7 @@ export default function App() {
           };
         });
 
-      const liveObjectivesSummary = getDailyObjectivesFormattedSummary(userProfile?.email, lang === "en");
+      const liveObjectivesSummary = getGoalsSummaryForSparring(lang);
 
       // Infallible persistent memory extraction from user text
       if (rawMessage) {
@@ -3879,7 +4060,7 @@ export default function App() {
           video: videoUrls[0] || undefined,
           videos: videoUrls.length > 0 ? videoUrls : undefined,
           scope: communicationScope === "ALL" ? "ALL" : "SINGLE",
-          dailyObjectives: liveObjectivesSummary.summaryText,
+          dailyObjectives: liveObjectivesSummary,
           clientDateStr: new Date().toLocaleDateString("de-DE", { weekday: "long", year: "numeric", month: "long", day: "numeric" }),
           memoryContext,
           userMemory,
@@ -4172,6 +4353,9 @@ export default function App() {
         isGoogleMapsInstalled={isGoogleMapsInstalled}
         isGoogleMapsOpen={Boolean(activeWidgets?.googleMaps)}
         onToggleGoogleMaps={() => handleToggleWidget("googleMaps")}
+        isGoalsInstalled={isGoalsInstalled}
+        isGoalsOpen={Boolean(activeWidgets?.goalsWidget)}
+        onToggleGoals={() => handleToggleWidget("goalsWidget")}
       />
     </div>
   );
@@ -4893,6 +5077,9 @@ export default function App() {
             isGoogleMapsInstalled={isGoogleMapsInstalled}
             isGoogleMapsOpen={Boolean(activeWidgets?.googleMaps)}
             onToggleGoogleMaps={() => handleToggleWidget("googleMaps")}
+            isGoalsInstalled={isGoalsInstalled}
+            isGoalsOpen={Boolean(activeWidgets?.goalsWidget)}
+            onToggleGoals={() => handleToggleWidget("goalsWidget")}
           />
         </div>
       )}
@@ -4974,6 +5161,9 @@ export default function App() {
             } else if (id === "maps" || id === "googleMaps") {
               setActiveWidgets((w) => ({ ...w, googleMaps: true }));
               handleToggleWidget("appStore");
+            } else if (id === "goals" || id === "papayaGoals") {
+              setActiveWidgets((w) => ({ ...w, goalsWidget: true }));
+              handleToggleWidget("appStore");
             }
           }}
         />
@@ -4999,21 +5189,44 @@ export default function App() {
         />
       )}
 
-      {/* Daily Objectives // 3 Core Focuses Spatial Widget */}
-      {!isFocusMode && activeWidgets?.dailyObjectives && (
-        <DailyObjectivesWidget
+      {/* PapayaOS Goals & Habit Tracker Spatial Widget */}
+      {activeWidgets?.goalsWidget && (
+        <PapayaGoalsWidget
           standalone={true}
-          userEmail={getCurrentUserEmail() || ""}
           isEditMode={isEditMode}
-          onClose={() => handleToggleWidget("dailyObjectives")}
-          onSendGoalToAgent={(goalText, agentId) => {
-            const targetAgent = agents.find((a) => a.id === agentId) || currentAgent;
-            handleSwitchAgent(targetAgent);
-            handleSendMessageToAgent(targetAgent.id, goalText, undefined, "SINGLE", false);
-            setShowChat(true);
-          }}
+          onClose={() => handleToggleWidget("goalsWidget")}
           agentColor={currentAgent.color}
           lang={lang}
+          currentAgentName={currentAgent.name}
+          onDiscussOverallGoals={() => {
+            const summary = getGoalsSummaryForSparring(lang);
+            const prompt =
+              lang === "en"
+                ? `Papaya Goals Executive Review:\n${summary}\nGive me a sharp strategic sparring as ${currentAgent.name}: What is going well, where are my bottlenecks, and how do I prioritize my next moves for maximum leverage?`
+                : `Papaya Goals Status-Review:\n${summary}\nGib mir als ${currentAgent.name} ein schonungsloses, strategisches Sparring: Was läuft gut, wo habe ich blinde Flecken, und wie priorisiere ich meine nächsten Schritte für maximalen Hebel?`;
+            handleSendMessageToAgent(currentAgent.id, prompt, undefined, "SINGLE", false);
+            setShowChat(true);
+          }}
+          onDiscussGoalWithAgent={(goal) => {
+            const perLabel =
+              goal.per === "w"
+                ? "Woche"
+                : goal.per === "m"
+                ? "Monat"
+                : goal.per === "y"
+                ? "Jahr"
+                : "Tag";
+            const subList =
+              goal.subtasks && goal.subtasks.length > 0
+                ? `\nAktuelle Teilschritte:\n${goal.subtasks.map((s, i) => `  ${i + 1}. ${s}`).join("\n")}`
+                : "";
+            const prompt =
+              lang === "en"
+                ? `Let's discuss my goal "${goal.title}" (${perLabel}).${subList}\nPlease analyze this goal, give me 3-5 concrete action items or sub-steps, point out potential obstacles, and tell me the highest leverage approach to execute it.`
+                : `Lass uns mein Ziel "${goal.title}" (${perLabel}) strategisch besprechen.${subList}\nBitte analysiere dieses Ziel, schlage mir 3-5 konkrete Teilschritte vor, weise mich auf potenzielle Hürden hin und sag mir, wie ich es mit maximalem Hebel umsetze.`;
+            handleSendMessageToAgent(currentAgent.id, prompt, undefined, "SINGLE", false);
+            setShowChat(true);
+          }}
         />
       )}
 

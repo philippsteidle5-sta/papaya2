@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   Calendar,
   MapPin,
+  Target,
   Trash2,
   Loader2,
   Check,
@@ -129,6 +130,18 @@ export const AppStoreWidget: React.FC<AppStoreWidgetProps> = ({
         installed: installedPluginIds.includes("maps") || installedPluginIds.includes("googleMaps"),
         modelInfo: "Google Maps Platform Live",
         contextWindow: "Global Geospatial",
+      },
+      {
+        id: "goals",
+        name: isEn ? "Papaya Goals" : "Papaya Goals",
+        category: isEn ? "Productivity & Focus" : "Produktivität & Fokus",
+        description: isEn
+          ? "All-in-one goals & habit tracker: 4-period rings, streak radar, 26-week heatmap, badges & XP leveling."
+          : "Ziele- & Gewohnheiten-Tracker: 4-Zeitraum-Ringe, Streak-Radar, 26-Wochen-Heatmap, Abzeichen & XP-Level-System.",
+        version: "v1.0 Pro",
+        installed: installedPluginIds.includes("goals"),
+        modelInfo: "PapayaOS Habit Engine",
+        contextWindow: "Complete Goal Sync",
       },
     ];
   }, [isEn, installedPluginIds]);
@@ -515,6 +528,8 @@ export const AppStoreWidget: React.FC<AppStoreWidgetProps> = ({
                             <Calendar className="w-5 h-5 text-purple-400" />
                           ) : plugin.id === "maps" ? (
                             <MapPin className="w-5 h-5 text-emerald-400" />
+                          ) : plugin.id === "goals" ? (
+                            <Target className="w-5 h-5 text-[#ff7a59]" />
                           ) : (
                             <LayoutGrid className="w-5 h-5 text-[#ff8a3d]" />
                           )}
@@ -652,6 +667,8 @@ export const AppStoreWidget: React.FC<AppStoreWidgetProps> = ({
                     <Calendar className="w-6 h-6 text-purple-400" />
                   ) : activePluginModal.id === "maps" ? (
                     <MapPin className="w-6 h-6 text-emerald-400" />
+                  ) : activePluginModal.id === "goals" ? (
+                    <Target className="w-6 h-6 text-[#ff7a59]" />
                   ) : (
                     <LayoutGrid className="w-6 h-6 text-[#ff8a3d]" />
                   )}

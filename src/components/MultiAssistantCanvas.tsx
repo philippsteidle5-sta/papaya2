@@ -100,6 +100,9 @@ interface MultiAssistantCanvasProps {
   isGoogleMapsInstalled?: boolean;
   isGoogleMapsOpen?: boolean;
   onToggleGoogleMaps?: () => void;
+  isGoalsInstalled?: boolean;
+  isGoalsOpen?: boolean;
+  onToggleGoals?: () => void;
 }
 
 export const MultiAssistantCanvas = React.memo<MultiAssistantCanvasProps>(({
@@ -162,6 +165,9 @@ export const MultiAssistantCanvas = React.memo<MultiAssistantCanvasProps>(({
   isGoogleMapsInstalled = false,
   isGoogleMapsOpen = false,
   onToggleGoogleMaps,
+  isGoalsInstalled = true,
+  isGoalsOpen = false,
+  onToggleGoals,
 }) => {
   const { isModern } = useTheme();
   const [prevAgentId, setPrevAgentId] = useState<string | null>(null);
@@ -528,6 +534,9 @@ export const MultiAssistantCanvas = React.memo<MultiAssistantCanvasProps>(({
           isGoogleMapsInstalled={isGoogleMapsInstalled}
           isGoogleMapsOpen={isGoogleMapsOpen}
           onToggleGoogleMaps={onToggleGoogleMaps}
+          isGoalsInstalled={isGoalsInstalled}
+          isGoalsOpen={isGoalsOpen}
+          onToggleGoals={onToggleGoals}
         />
       </div>
 
@@ -559,6 +568,8 @@ export const MultiAssistantCanvas = React.memo<MultiAssistantCanvasProps>(({
         lang={lang}
         muted={muted}
         onToggleMute={onToggleMute}
+        communicationScope={communicationScope}
+        onSelectCommunicationScope={onSelectCommunicationScope}
       />
 
       {/* Standalone Fallback Calendar in Focus Canvas */}

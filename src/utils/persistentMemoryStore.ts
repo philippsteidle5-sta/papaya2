@@ -18,77 +18,11 @@ export interface PersistentMemoryState {
 const MEMORY_STORAGE_KEY = "syntax_agent_persistent_memory_v1";
 
 const DEFAULT_MEMORY_STATE: PersistentMemoryState = {
-  preferredName: "Mr",
-  facts: [
-    {
-      id: "fact-name-01",
-      fact: "Der Operator wird mit 'Mr' angesprochen.",
-      category: "name",
-      timestamp: "09:00",
-      agentId: "syntax",
-    },
-    {
-      id: "fact-rule-01",
-      fact: "Sovereign OS Architektur: 8 spezialisierte Cores arbeiten autonom im Verbund.",
-      category: "rule",
-      timestamp: "09:02",
-      agentId: "syntax",
-    },
-    {
-      id: "fact-perf-01",
-      fact: "Conversion-Rate und Beta-Key Metriken verbleiben exklusiv im geschützten Admin-Bereich.",
-      category: "preference",
-      timestamp: "09:05",
-      agentId: "neo",
-    },
-    {
-      id: "fact-tech-01",
-      fact: "2.514 Memory-Knoten sind im 3D Universe über alle 8 Agenten gleichmäßig verteilt.",
-      category: "fact",
-      timestamp: "09:10",
-      agentId: "vega",
-    },
-  ],
-  customDirectives: [
-    "Präzise, faktenbasierte und souveräne Antworten liefern.",
-    "Alle 8 Cores synchron halten und Latenzen unter 300ms garantieren.",
-    "Admin-Kennzahlen strikt vor unberechtigtem Zugriff schützen.",
-  ],
-  agentSpecificNotes: {
-    syntax: [
-      "Orchestriert 315 primäre Routing- und Flotten-Workflows.",
-      "Hält Quantum-Puffer und Token-Quota im Gleichgewicht.",
-    ],
-    neo: [
-      "Betreut 315 Conversion-, Funnel- und Preis-Strategien.",
-      "Optimiert die psychologische Aktivierungsrate der VIP-Keys.",
-    ],
-    vega: [
-      "Verwaltet 314 Full-Stack Code-, Datenbank- und Cache-Architekturen.",
-      "60 FPS 3D Universe und virtualisiertes Infinite Scrolling.",
-    ],
-    odin: [
-      "Überwacht 314 Defense-Audits, Screen Vision Scans und RBAC-Routen.",
-      "Zero-Trust Schutz für sensible Operator-Daten.",
-    ],
-    pulse: [
-      "Generiert 314 virale Veo 3.1 Prompts, TikTok Skripte und Hooklines.",
-      "Multi-Channel Copywriting für maximale Reichweite.",
-    ],
-    chronos: [
-      "Koordiniert 314 zeitgesteuerte Cronjobs, Midnight-Rollover und Pipelines.",
-      "Automatisierte Token-Erneuerung um 00:00 Uhr.",
-    ],
-    oracle: [
-      "Berechnet 314 Finanz-Modelle, MRR-Wachstum und LTV-Projektionen.",
-      "Quant-Vorhersagen für nachhaltige SaaS-Skalierung.",
-    ],
-    globe: [
-      "Führt 314 Quad-Core Deep Searches mit Grounding-Zitaten durch.",
-      "Echtzeit-Web-Recherche und globale AI-Trends.",
-    ],
-  },
-  totalLearnedCount: 2514,
+  preferredName: "",
+  facts: [],
+  customDirectives: [],
+  agentSpecificNotes: {},
+  totalLearnedCount: 0,
   lastUpdated: new Date().toISOString(),
 };
 
@@ -100,34 +34,32 @@ function loadMemoryFromStorage(): PersistentMemoryState {
   if (typeof window === "undefined") return DEFAULT_MEMORY_STATE;
   try {
     const raw = localStorage.getItem(MEMORY_STORAGE_KEY);
-    let resolvedName = "Philipp"; // Sensible default for the user
-
-    // Check if user has a stored profile or email
-    try {
-      const profileRaw = localStorage.getItem("syntax_user_profile");
-      if (profileRaw) {
-        const p = JSON.parse(profileRaw);
-        if (p.name && p.name !== "User" && p.name !== "Mr") {
-          resolvedName = p.name;
-        }
-      }
-    } catch (_) {}
-
     if (raw) {
       const parsed = JSON.parse(raw);
-      const chosenName = (parsed.preferredName && parsed.preferredName !== "Mr") ? parsed.preferredName : resolvedName;
+      // Detect legacy seeded memory containing invented facts/prompts and reset to 0
+      const isSeededLegacy =
+        parsed.totalLearnedCount === 2514 ||
+        (Array.isArray(parsed.facts) &&
+          parsed.facts.some(
+            (f: any) =>
+              typeof f.fact === "string" &&
+              (f.fact.includes("2.514 Memory-Knoten") ||
+                f.fact.includes("Der Operator wird mit 'Mr' angesprochen") ||
+                f.fact.includes("Sovereign OS Architektur"))
+          ));
+
+      if (isSeededLegacy) {
+        localStorage.removeItem(MEMORY_STORAGE_KEY);
+        return DEFAULT_MEMORY_STATE;
+      }
+
       return {
-        ...DEFAULT_MEMORY_STATE,
-        ...parsed,
-        preferredName: chosenName,
+        preferredName: parsed.preferredName || "",
         facts: Array.isArray(parsed.facts) ? parsed.facts : [],
         customDirectives: Array.isArray(parsed.customDirectives) ? parsed.customDirectives : [],
         agentSpecificNotes: parsed.agentSpecificNotes || {},
-      };
-    } else {
-      return {
-        ...DEFAULT_MEMORY_STATE,
-        preferredName: resolvedName,
+        totalLearnedCount: typeof parsed.totalLearnedCount === "number" ? parsed.totalLearnedCount : 0,
+        lastUpdated: parsed.lastUpdated || new Date().toISOString(),
       };
     }
   } catch (e) {
@@ -365,38 +297,44 @@ export function extractAndSaveMemoryFromUserText(
  */
 export function getPersistentMemoryContextForPrompt(agentId?: string): string {
   const mem = getPersistentMemory();
+  const hasFacts = Array.isArray(mem.facts) && mem.facts.length > 0;
+  const hasDirectives = Array.isArray(mem.customDirectives) && mem.customDirectives.length > 0;
+  const hasNotes = agentId && mem.agentSpecificNotes && mem.agentSpecificNotes[agentId] && mem.agentSpecificNotes[agentId].length > 0;
+  const hasName = Boolean(mem.preferredName && mem.preferredName.trim().length > 0);
+
+  // If memory is empty (0 facts, 0 directives, no custom name), do not inject any invented facts
+  if (!hasFacts && !hasDirectives && !hasNotes && !hasName) {
+    return "";
+  }
+
   const parts: string[] = [];
+  parts.push(`=== PERSISTENTES LANGZEITGEDÄCHTNIS (ECHTE NUTZER-ANGABEN) ===`);
 
-  const displayName = mem.preferredName && mem.preferredName !== "Mr" ? mem.preferredName : "Philipp";
+  if (hasName) {
+    parts.push(`• NAME DES NUTZERS: "${mem.preferredName}"`);
+  }
 
-  parts.push(`=== PERSISTENTES UNVERGESSLICHES LANGZEITGEDÄCHTNIS (FOREVER REMEMBERED) ===`);
-  parts.push(`• BEVORZUGTER NAME / ANREDE DES NUTZERS: "${displayName}"`);
-  parts.push(`  -> ABSOLUTE PRIORITÄT: Sprich den Nutzer persönlich mit "${displayName}" an (nicht stur mit "Mr", es sei denn er verlangt es)!`);
-
-  if (mem.facts.length > 0) {
-    parts.push(`• EINGEPRÄGTE FAKTEN & PERSÖNLICHE DETAILS DES NUTZERS:`);
+  if (hasFacts) {
+    parts.push(`• VOM NUTZER GENANNTE FAKTEN:`);
     mem.facts.slice(0, 25).forEach((f, idx) => {
-      parts.push(`  [${idx + 1}] ${f.fact} (Gespeichert am ${f.timestamp})`);
+      parts.push(`  [${idx + 1}] ${f.fact}`);
     });
   }
 
-  if (mem.customDirectives.length > 0) {
-    parts.push(`• VOM NUTZER DEFINIERTE DAUERHAFTE REGELN & VERHALTENSANWEISUNGEN:`);
+  if (hasDirectives) {
+    parts.push(`• VOM NUTZER VORGEGEBENE REGELN:`);
     mem.customDirectives.slice(0, 15).forEach((d, idx) => {
       parts.push(`  [Regel ${idx + 1}] ${d}`);
     });
   }
 
-  if (agentId && mem.agentSpecificNotes[agentId]?.length) {
+  if (hasNotes) {
     parts.push(`• SPEZIFISCHE NOTIZEN FÜR DICH (${agentId.toUpperCase()}):`);
     mem.agentSpecificNotes[agentId].slice(0, 10).forEach((n, idx) => {
       parts.push(`  - ${n}`);
     });
   }
 
-  parts.push(`STRIKTE GEDÄCHTNIS-DIREKTIVE:
-Du verfügst über ein unfehlbares, permanentes Langzeitgedächtnis. Alle Absprachen, Vorlieben und Anweisungen des Nutzers sind für alle 8 Cores der Flotte verbindlich.`);
   parts.push(`=== ENDE LANGZEITGEDÄCHTNIS ===\n`);
-
   return parts.join("\n");
 }

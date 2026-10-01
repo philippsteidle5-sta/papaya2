@@ -1190,66 +1190,9 @@ async function startServer() {
   // In-Memory Backend Memory Store
   const BACKEND_MEMORY_STORE: BackendMemoryNode[] = [];
 
-  // Seed with 2,514 real memories across all 8 agent domains
+  // Seed with real user memories only (starts at 0)
   function initializeBackendMemoryStore() {
-    if (BACKEND_MEMORY_STORE.length > 0) return;
-
-    const TARGET_COUNT = 2514;
-    const now = Date.now();
-    const FORTY_FIVE_DAYS_MS = 45 * 24 * 60 * 60 * 1000;
-
-    let idCounter = 1;
-    for (let i = 0; i < TARGET_COUNT; i++) {
-      const clusterIdx = i % DOMAIN_SEEDS.length;
-      const seed = DOMAIN_SEEDS[clusterIdx];
-      const qIdx = Math.floor(i / DOMAIN_SEEDS.length) % seed.queries.length;
-      const tIdx = Math.floor(i / DOMAIN_SEEDS.length) % seed.thoughts.length;
-      const rIdx = Math.floor(i / DOMAIN_SEEDS.length) % seed.responses.length;
-
-      const baseQuery = seed.queries[qIdx];
-      const baseThought = seed.thoughts[tIdx];
-      const baseResponse = seed.responses[rIdx];
-
-      const cycle = Math.floor(i / (DOMAIN_SEEDS.length * seed.queries.length)) + 1;
-      const queryText = cycle > 1 ? `${baseQuery} [Zyklus #${cycle} · Core-Thread ${i % 8}]` : baseQuery;
-
-      const fraction = (TARGET_COUNT - i) / TARGET_COUNT;
-      const dateObj = new Date(now - Math.floor(fraction * FORTY_FIVE_DAYS_MS));
-      const hours = String(dateObj.getHours()).padStart(2, "0");
-      const mins = String(dateObj.getMinutes()).padStart(2, "0");
-      const secs = String(dateObj.getSeconds()).padStart(2, "0");
-
-      const promptTokens = Math.max(18, Math.round(queryText.length * 0.72));
-      const completionTokens = Math.max(80, Math.round(baseResponse.length * 0.68));
-      const thoughtTokens = Math.max(30, Math.round(baseThought.length * 0.70));
-
-      BACKEND_MEMORY_STORE.push({
-        id: `MEM-${seed.agentId.toUpperCase()}-${String(idCounter).padStart(5, "0")}`,
-        agentId: seed.agentId,
-        agentName: seed.agentName,
-        agentShort: seed.agentId.toUpperCase(),
-        agentColor: REAL_BACKEND_CLUSTERS[clusterIdx].c,
-        cluster: clusterIdx,
-        title: baseQuery.length > 60 ? baseQuery.slice(0, 58) + "..." : baseQuery,
-        prompt: queryText,
-        thought: baseThought,
-        response: baseResponse,
-        tokens: {
-          promptTokens,
-          completionTokens,
-          thoughtTokens,
-          totalTokens: promptTokens + completionTokens + thoughtTokens,
-        },
-        latencyMs: 180 + ((i * 23) % 220),
-        timestamp: `${hours}:${mins}:${secs}`,
-        isoDate: dateObj.toISOString(),
-        tags: [...seed.tags, seed.agentId],
-        uses: 1 + ((i * 13) % 290),
-        source: "backend-real",
-      });
-
-      idCounter++;
-    }
+    // Pure neutral state: no pre-seeded memories or invented prompts
   }
 
   initializeBackendMemoryStore();
@@ -1376,6 +1319,12 @@ async function startServer() {
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to add memory" });
     }
+  });
+
+  // POST /api/memories/clear - Reset all backend memories to 0
+  app.post("/api/memories/clear", (_req, res) => {
+    BACKEND_MEMORY_STORE.length = 0;
+    res.json({ success: true, message: "Backend memory store cleared to 0", count: 0 });
   });
 
   // DELETE /api/memories/:id - Remove a specific memory
@@ -1645,8 +1594,8 @@ STRIKTE ANWEISUNG FÜR DIE ANALYSE DIESER WEBSEITE:
       let userMemoryPromptContext = "";
       if (memoryContext && typeof memoryContext === "string" && memoryContext.trim().length > 0) {
         userMemoryPromptContext = `\n\n${memoryContext.trim()}`;
-      } else if (userMemory) {
-        const preferredName = (userMemory.preferredName && userMemory.preferredName !== "Mr") ? userMemory.preferredName : "Philipp";
+      } else if (userMemory && (userMemory.preferredName || (Array.isArray(userMemory.facts) && userMemory.facts.length > 0) || (Array.isArray(userMemory.customDirectives) && userMemory.customDirectives.length > 0))) {
+        const preferredName = userMemory.preferredName || "";
         const factsList = Array.isArray(userMemory.facts)
           ? userMemory.facts.map((f: any, idx: number) => `  [${idx + 1}] ${typeof f === "string" ? f : f.fact || JSON.stringify(f)}`).join("\n")
           : "";
@@ -1654,13 +1603,8 @@ STRIKTE ANWEISUNG FÜR DIE ANALYSE DIESER WEBSEITE:
           ? userMemory.customDirectives.map((d: any, idx: number) => `  [Regel ${idx + 1}] ${d}`).join("\n")
           : "";
 
-        userMemoryPromptContext = `\n\n=== PERSISTENTES UNVERGESSLICHES LANGZEITGEDÄCHTNIS (FOREVER REMEMBERED) ===
-• BEVORZUGTER NAME / ANREDE DES NUTZERS: "${preferredName}"
-  -> Anweisung: Du sprichst den Nutzer persönlich mit "${preferredName}" an!
-${factsList ? `• EINGEPRÄGTE FAKTEN & DETAILS DES NUTZERS:\n${factsList}\n` : ""}${directivesList ? `• REGELN & DIREKTIVEN DES NUTZERS:\n${directivesList}\n` : ""}
-STRIKTE GEDÄCHTNIS-DIREKTIVE:
-Du verfügst über ein unfehlbares Langzeitgedächtnis. Alles, was der Nutzer dir jemals gesagt hat (wie sein Name, seine Anweisungen, seine Vorlieben), ist unvergänglich und dauerhaft aktiv.
-=== ENDE LANGZEITGEDÄCHTNIS ===`;
+        userMemoryPromptContext = `\n\n=== PERSISTENTES LANGZEITGEDÄCHTNIS (ECHTE NUTZER-ANGABEN) ===
+${preferredName ? `• NAME DES NUTZERS: "${preferredName}"\n` : ""}${factsList ? `• VOM NUTZER GENANNTE FAKTEN:\n${factsList}\n` : ""}${directivesList ? `• REGELN DES NUTZERS:\n${directivesList}\n` : ""}=== ENDE LANGZEITGEDÄCHTNIS ===`;
       }
 
       let ai;
@@ -2132,8 +2076,8 @@ STRIKTE REGELN FÜR DICH ALS ${activeAgentName}:
 3. CLAUDE FÜR CODE: Wenn der Nutzer nach Code, Software-Entwicklung, Skripten oder Programmierung fragt, nutze für den Codeblock die CLAUDE CODE ENGINE (Claude 3.5 Sonnet Architektur) in sauberem Markdown (\`\`\`typescript oder \`\`\`tsx).
 4. Sprich NIEMALS im Namen anderer Agenten (wie SYNTAX, N.E.O., VEGA etc.)! Erwähne KEINE anderen Agenten! Es existiert kein Agent namens MAZE.
 5. Erstelle KEINE Listen oder Aufzählungen für andere Agenten!
-6. ANSPRACHE & ERINNERUNGEN: Sei kein stummer Zahlen-Roboter. Wenn der Nutzer nach Erinnerungen, früheren Fragen ("Erinnerst du dich an...") oder Details fragt, bestätige dies direkt mit futuristischer Coolness und Witz, bevor du die exakte Lösung lieferst.
-7. Sprich den Nutzer stets mit "${userMemory?.preferredName || 'Mr'}" an.
+6. ANSPRACHE & ERINNERUNGEN: Sei kein stummer Zahlen-Roboter. Wenn der Nutzer nach Erinnerungen, früheren Fragen ("Erinnerst du dich an...") oder Details fragt, antworte direkt, präzise und lebendig.
+7. ANREDE: ${userMemory?.preferredName ? `Sprich den Nutzer mit seinem Namen "${userMemory.preferredName}" an.` : `Sprich den Nutzer direkt und professionell an. Verwende keine erfundenen Titel wie 'Mr' oder 'Boss', es sei denn der Nutzer fordert es explizit.`}
 
 Gliedere deine Ausgabe starr in zwei Teile:
 🧠 [GEDANKE]: Kurzer scharfsinniger Gedanke rein als ${activeAgentName}.

@@ -59,8 +59,9 @@ export function getQueryStorageKey(userEmail?: string): string {
   return `${STORAGE_PREFIX}${clean}`;
 }
 
-// Rich pre-seeded queries showcasing all 8 Agent Cores
-export const INITIAL_DEFAULT_QUERIES: QueryLogEntry[] = [
+// Clean default queries: starts at 0
+export const INITIAL_DEFAULT_QUERIES: QueryLogEntry[] = [];
+const _UNUSED_SEED_QUERIES: any[] = [
   {
     id: "seed-syntax-01",
     agentId: "syntax",
@@ -251,7 +252,8 @@ export function getQueryLogs(userEmail?: string): QueryLogEntry[] {
 
       parsed.forEach((entry) => {
         if (!entry || typeof entry !== "object") return;
-        if (entry.id && String(entry.id).startsWith("mem-")) {
+        const isSeedOrMem = entry.id && (String(entry.id).startsWith("mem-") || String(entry.id).startsWith("seed-"));
+        if (isSeedOrMem) {
           if (entry.isStarred !== undefined) {
             starredOverrides.set(entry.id, entry.isStarred);
           }

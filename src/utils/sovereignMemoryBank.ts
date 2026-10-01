@@ -595,12 +595,6 @@ export function generate2514SovereignMemories(userEmail?: string): QueryLogEntry
   return result;
 }
 
-// Cached instance of 2,514 memories for ultra-fast instant synchronous lookups
-let cached2514Memories: QueryLogEntry[] | null = null;
-
-export function get2514SovereignMemories(userEmail?: string): QueryLogEntry[] {
-  if (!cached2514Memories || cached2514Memories.length !== 2514) {
-    cached2514Memories = generate2514SovereignMemories(userEmail);
-  }
-  return cached2514Memories;
+export function get2514SovereignMemories(_userEmail?: string): QueryLogEntry[] {
+  return [];
 }

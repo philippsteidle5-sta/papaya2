@@ -9,6 +9,7 @@ import {
   ChevronDown,
   LayoutGrid,
   MapPin,
+  Target,
 } from "lucide-react";
 
 interface LiquidJellyNavProps {
@@ -34,6 +35,9 @@ interface LiquidJellyNavProps {
   isGoogleMapsInstalled?: boolean;
   isGoogleMapsOpen?: boolean;
   onToggleGoogleMaps?: () => void;
+  isGoalsInstalled?: boolean;
+  isGoalsOpen?: boolean;
+  onToggleGoals?: () => void;
 }
 
 export const LiquidJellyNav: React.FC<LiquidJellyNavProps> = ({
@@ -57,6 +61,9 @@ export const LiquidJellyNav: React.FC<LiquidJellyNavProps> = ({
   isGoogleMapsInstalled = false,
   isGoogleMapsOpen = false,
   onToggleGoogleMaps,
+  isGoalsInstalled = true,
+  isGoalsOpen = false,
+  onToggleGoals,
 }) => {
   return (
     <div className="relative flex flex-col items-center justify-center pointer-events-auto select-none">
@@ -181,6 +188,23 @@ export const LiquidJellyNav: React.FC<LiquidJellyNavProps> = ({
             >
               <span className="absolute -top-[120%] -left-[45%] w-[42%] h-[340%] bg-gradient-to-r from-transparent via-white/15 to-transparent rotate-[16deg] opacity-0 group-hover:opacity-100 group-hover:left-[110%] transition-all duration-700 pointer-events-none" />
               <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
+            </button>
+          )}
+
+          {/* Item 5.6: Papaya Goals Trigger (ONLY VISIBLE ONCE INSTALLED) */}
+          {isGoalsInstalled && onToggleGoals && (
+            <button
+              type="button"
+              onClick={onToggleGoals}
+              className={`group relative flex items-center justify-center w-11 h-11 rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden ${
+                isGoalsOpen
+                  ? "bg-[#ff7a59]/35 border-[#ff7a59] text-white shadow-[0_0_18px_rgba(255,122,89,0.5)]"
+                  : "border-white/[0.08] hover:border-[#ff7a59]/40 bg-gradient-to-b from-white/[0.08] to-white/[0.02] hover:from-white/[0.14] hover:to-white/[0.05] text-zinc-300 hover:text-white"
+              }`}
+              title={isGoalsOpen ? "Goals schließen" : "Papaya Goals (Ziele, Gewohnheiten & XP) öffnen"}
+            >
+              <span className="absolute -top-[120%] -left-[45%] w-[42%] h-[340%] bg-gradient-to-r from-transparent via-white/15 to-transparent rotate-[16deg] opacity-0 group-hover:opacity-100 group-hover:left-[110%] transition-all duration-700 pointer-events-none" />
+              <Target className="w-4 h-4 text-[#ff7a59] shrink-0" />
             </button>
           )}
 

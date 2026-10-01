@@ -180,7 +180,7 @@ export const AetherChatCard: React.FC<AetherChatCardProps> = ({
           1. COLLAPSED PILL: [ ∴  Ask S.Y.N.T.A.X. ] (Matches Image 1)
          ───────────────────────────────────────────────────────────── */}
       {!isOpen && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 pointer-events-auto select-none transition-all duration-300 animate-fade-in">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 pointer-events-auto select-none transition-all duration-300 animate-fade-in flex items-center gap-3">
           <button
             type="button"
             onClick={onToggleOpen}
@@ -219,6 +219,18 @@ export const AetherChatCard: React.FC<AetherChatCardProps> = ({
               </span>
             )}
           </button>
+
+          {/* Quick Agenten-Modus Control (Einzeln | Big 3 | Alle 8) */}
+          {onSelectCommunicationScope && (
+            <div className="hidden md:block shadow-[0_18px_45px_rgba(0,0,0,0.65)]">
+              <AgentModeSegmentControl
+                currentScope={communicationScope}
+                onSelectScope={onSelectCommunicationScope}
+                lang={lang}
+                compact={false}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -283,6 +295,18 @@ export const AetherChatCard: React.FC<AetherChatCardProps> = ({
                   · {isAllMode ? "Matrix" : isBig3Mode ? "Tri-Core" : "Autonomous Core"}
                 </span>
               </div>
+
+              {/* Agent Mode Switcher (Einzeln | Big 3 | Alle 8) */}
+              {onSelectCommunicationScope && (
+                <div className="hidden sm:block">
+                  <AgentModeSegmentControl
+                    currentScope={communicationScope}
+                    onSelectScope={onSelectCommunicationScope}
+                    lang={lang}
+                    compact={true}
+                  />
+                </div>
+              )}
 
               {/* Header Actions */}
               <div className="flex items-center gap-1 text-zinc-400">

@@ -239,9 +239,8 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
     };
   }, []);
 
-  // Construct 22,000 Nodes with unique real backend memories and distinct sovereign background nodes
+  // Construct Real User Nodes only (starts at 0)
   const { nodeData, CL, counts } = useMemo(() => {
-    const sovereignBase = get2514SovereignMemories();
     const userList: Array<{
       id: string;
       agentId: string;
@@ -260,15 +259,17 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
     const seenUserKeys = new Set<string>();
 
     const addMemoryIfUnique = (m: any) => {
+      const code = String(m.id || m.code || "");
+      if (code.startsWith("seed-") || code.startsWith("mem-") || code.startsWith("SOV-")) return;
       const prompt = m.prompt || m.query || "";
       const normPrompt = prompt.trim().toLowerCase();
-      const code = m.id || m.code || "";
+      if (!normPrompt) return;
       const key = `${code}::${normPrompt}`;
-      if (!normPrompt || seenUserKeys.has(key) || seenUserKeys.has(normPrompt)) return;
+      if (seenUserKeys.has(key) || seenUserKeys.has(normPrompt)) return;
       seenUserKeys.add(key);
       seenUserKeys.add(normPrompt);
       userList.push({
-        id: code,
+        id: code || `MEM-${userList.length + 1}`,
         agentId: m.agentId || "syntax",
         agentName: m.agentName,
         title: m.title || prompt,
@@ -293,9 +294,6 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
       memories.forEach(addMemoryIfUnique);
     }
 
-    const totalUser = userList.length;
-    const totalSov = sovereignBase.length > 0 ? sovereignBase.length : 1;
-
     const data: Array<{
       id: number;
       code: string;
@@ -311,39 +309,27 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
       createdAt: string;
     }> = [];
 
-    const tempCL = new Uint8Array(N);
+    const tempCL = new Uint8Array(userList.length);
     const tempCounts = new Array(CLU.length).fill(0);
 
-    for (let i = 0; i < N; i++) {
-      let src: any = undefined;
-      let isUserMemory = false;
-
-      if (i < totalUser) {
-        // Authentic user chat memory placed uniquely ONCE (no tiling/repetition!)
-        src = userList[i];
-        isUserMemory = true;
-      } else {
-        // Distinct sovereign base memory
-        const sovIdx = (i - totalUser) % totalSov;
-        src = sovereignBase[sovIdx];
-      }
-
+    for (let i = 0; i < userList.length; i++) {
+      const src = userList[i];
       const agentId = (src?.agentId || "syntax").toLowerCase();
       let clIdx = CLU.findIndex((c) => c.agentId === agentId);
-      if (clIdx === -1) clIdx = i % CLU.length;
+      if (clIdx === -1) clIdx = 0;
 
       tempCL[i] = clIdx;
       tempCounts[clIdx]++;
 
-      const rawTitle = src?.title || `Sovereign Matrix Core [${CLU[clIdx].k}]`;
+      const rawTitle = src.title || src.prompt;
       const title = rawTitle.length > 65 ? rawTitle.slice(0, 62) + "..." : rawTitle;
-      const prompt = src?.prompt || rawTitle;
-      const response = src?.response || "Direktive im Sovereign Memory verankert.";
-      const thought = src?.thought;
-      const latencyMs = src?.latencyMs || (180 + ((i * 17) % 220));
-      const tokensCount = src?.tokens?.totalTokens || Math.max(15, Math.round(prompt.length / 3.6));
-      const uses = src?.uses || (1 + ((i * 19) % 280));
-      const code = isUserMemory ? src?.id || `MEM-${i + 1}` : `SOV-${CLU[clIdx].k}-${String(i + 1).padStart(5, "0")}`;
+      const prompt = src.prompt || rawTitle;
+      const response = src.response || "Direktive im Memory verankert.";
+      const thought = src.thought;
+      const latencyMs = src.latencyMs || 220;
+      const tokensCount = src.tokens?.totalTokens || Math.max(15, Math.round(prompt.length / 3.6));
+      const uses = src.uses || 1;
+      const code = src.id;
 
       data.push({
         id: i,
@@ -356,13 +342,13 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
         uses,
         tokens: tokensCount,
         latencyMs,
-        tags: src?.tags || [CLU[clIdx].k.toLowerCase(), isUserMemory ? "live-memory" : "sovereign-core"],
-        createdAt: src?.timestamp || "2026-09-28",
+        tags: src.tags || [CLU[clIdx].k.toLowerCase(), "live-memory"],
+        createdAt: src.timestamp || "Neu",
       });
     }
 
     return { nodeData: data, CL: tempCL, counts: tempCounts };
-  }, [N, memories, backendMemories]);
+  }, [memories, backendMemories]);
 
   useEffect(() => {
     setClusterCounts(counts);
@@ -372,8 +358,11 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
   const searchResults = useMemo(() => {
     const t0 = performance.now();
     const q = debouncedQuery.trim().toLowerCase();
+    if (nodeData.length === 0) {
+      return { total: 0, ids: null, items: [] };
+    }
     if (!q && activeCluster < 0) {
-      return { total: N, ids: null, items: [] };
+      return { total: nodeData.length, ids: null, items: [] };
     }
 
     const tokens = q.split(/\s+/).filter(Boolean);
@@ -381,7 +370,7 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
     const seenMatchKeys = new Set<string>();
     const uniqueMatchedIds: number[] = [];
 
-    for (let i = 0; i < N; i++) {
+    for (let i = 0; i < nodeData.length; i++) {
       if (activeCluster >= 0 && CL[i] !== activeCluster) continue;
 
       if (tokens.length === 0) {
@@ -390,16 +379,19 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
         continue;
       }
 
+      const item = nodeData[i];
+      if (!item) continue;
+
       const itemText = (
-        nodeData[i].title +
+        item.title +
         " " +
-        nodeData[i].prompt +
+        item.prompt +
         " " +
-        nodeData[i].tags.join(" ") +
+        item.tags.join(" ") +
         " " +
-        CLU[CL[i]].k +
+        (CLU[CL[i]]?.k || "") +
         " " +
-        CLU[CL[i]].n
+        (CLU[CL[i]]?.n || "")
       ).toLowerCase();
 
       let match = true;
@@ -411,7 +403,7 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
       }
       if (match) {
         matchedIds.push(i);
-        const dedupeKey = `${nodeData[i].prompt.trim().toLowerCase()}::${nodeData[i].code}`;
+        const dedupeKey = `${item.prompt.trim().toLowerCase()}::${item.code}`;
         if (!seenMatchKeys.has(dedupeKey)) {
           seenMatchKeys.add(dedupeKey);
           uniqueMatchedIds.push(i);
@@ -423,8 +415,8 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
     const sc = new Float32Array(uniqueMatchedIds.length);
     for (let k = 0; k < uniqueMatchedIds.length; k++) {
       const i = uniqueMatchedIds[k];
-      const T = nodeData[i].title.toLowerCase();
-      let score = nodeData[i].uses / 300;
+      const T = (nodeData[i]?.title || "").toLowerCase();
+      let score = (nodeData[i]?.uses || 1) / 300;
       for (const t of tokens) {
         const idx = T.indexOf(t);
         if (idx >= 0) score += 2 + (idx === 0 ? 1 : 0);
@@ -438,12 +430,12 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
       return sc[idxB] - sc[idxA];
     });
 
-    const items = sortedIds.slice(0, 45).map((id) => nodeData[id]);
+    const items = sortedIds.slice(0, 45).map((id) => nodeData[id]).filter(Boolean);
     const ms = Math.max(8, Math.round(performance.now() - t0));
     setSearchMs(ms);
 
     return { total: uniqueMatchedIds.length, ids: matchedIds, items };
-  }, [debouncedQuery, activeCluster, N, nodeData, CL]);
+  }, [debouncedQuery, activeCluster, nodeData, CL]);
 
   // Three.js State Refs
   const threeRef = useRef<{
@@ -457,6 +449,10 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
     brain: Float32Array;
     scat: Float32Array;
     seed: Float32Array;
+    col: Float32Array;
+    colAttr: THREE.BufferAttribute;
+    active: Float32Array;
+    activeAttr: THREE.BufferAttribute;
     hit: Float32Array;
     hitAttr: THREE.BufferAttribute;
     selected: Float32Array;
@@ -509,9 +505,7 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
     const scat = new Float32Array(N * 3);
     const col = new Float32Array(N * 3);
     const seed = new Float32Array(N);
-
-    const orange = [1, 0.6, 0.22];
-    const blue = [0.35, 0.62, 1];
+    const active = new Float32Array(N).fill(0);
 
     for (let i = 0; i < N; i++) {
       const u = Math.random();
@@ -525,20 +519,22 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
       const b = Math.acos(2 * Math.random() - 1);
       scat.set([R * Math.sin(b) * Math.cos(a) * 1.5, R * Math.cos(b), R * Math.sin(b) * Math.sin(a)], i * 3);
 
-      const m = kind === 1 ? 0.8 + 0.2 * Math.random() : kind === 2 ? 0.1 : 0.5 + 0.5 * Math.sin(p[0] * 2.3 + p[2] * 1.7 + Math.random() * 1.5);
-      const w = Math.random() < 0.04 ? 1 : 0;
-
-      for (let k = 0; k < 3; k++) {
-        col[i * 3 + k] = w ? 1 : orange[k] * (1 - m) + blue[k] * m;
-      }
+      // Inactive empty cells are dim neutral grey by default
+      col[i * 3] = 0.15;
+      col[i * 3 + 1] = 0.18;
+      col[i * 3 + 2] = 0.22;
       seed[i] = Math.random();
     }
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(brain, 3));
     geo.setAttribute("aScatter", new THREE.BufferAttribute(scat, 3));
-    geo.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
+    const colAttr = new THREE.BufferAttribute(col, 3);
+    geo.setAttribute("aColor", colAttr);
     geo.setAttribute("aSeed", new THREE.BufferAttribute(seed, 1));
+
+    const activeAttr = new THREE.BufferAttribute(active, 1);
+    geo.setAttribute("aActive", activeAttr);
 
     const hit = new Float32Array(N).fill(1);
     const hitAttr = new THREE.BufferAttribute(hit, 1);
@@ -568,10 +564,12 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
         attribute float aSeed;
         attribute float aHit;
         attribute float aSelected;
+        attribute float aActive;
         uniform float uP, uTime, uMotion, uSize, uPx, uFilter;
         varying vec3 vC;
         varying float vA;
         varying float vSel;
+        varying float vActive;
 
         void main(){
           float e = uP * uP * (3.0 - 2.0 * uP);
@@ -582,7 +580,10 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
             sin(uTime * 0.4 + aSeed * 57.0)
           ) * (0.4 + e * 1.8);
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
-          float baseSize = (uSize * uPx * (0.5 + aSeed * 0.9) / -mv.z * mix(1.0, mix(0.55, 1.5, aHit), uFilter));
+          
+          // Empty/dormant particles are smaller and subtle; real prompts light up bigger
+          float scaleFactor = (aActive > 0.5) ? 1.0 : 0.42;
+          float baseSize = (uSize * uPx * (0.45 + aSeed * 0.8) * scaleFactor / -mv.z * mix(1.0, mix(0.55, 1.5, aHit), uFilter));
           if (aSelected > 0.5) {
             gl_PointSize = max(24.0 * uPx, baseSize * 3.0);
           } else {
@@ -590,14 +591,19 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
           }
           gl_Position = projectionMatrix * mv;
           vC = aColor;
-          vA = mix(1.0, 0.6, e) * mix(1.0, mix(0.1, 1.5, aHit), uFilter);
+
+          // Active prompt nodes have full glowing alpha, empty dormant cells have faint ghost-grey alpha
+          float baseAlpha = (aActive > 0.5) ? 0.95 : 0.12;
+          vA = mix(baseAlpha, baseAlpha * 0.6, e) * mix(1.0, mix(0.1, 1.5, aHit), uFilter);
           vSel = aSelected;
+          vActive = aActive;
         }
       `,
       fragmentShader: `
         varying vec3 vC;
         varying float vA;
         varying float vSel;
+        varying float vActive;
         void main(){
           float d = length(gl_PointCoord - 0.5);
           if (d > 0.5) discard;
@@ -607,11 +613,16 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
             vec3 col = mix(vC * 1.8, vec3(1.0, 1.0, 1.0), core * 0.85);
             float alpha = max(0.98, halo);
             gl_FragColor = vec4(col * halo, alpha);
-          } else {
+          } else if (vActive > 0.5) {
+            // Vibrant glowing prompt node
             float a = smoothstep(0.5, 0.0, d);
-            vec3 col = vC;
-            float alpha = vA * 0.92;
-            gl_FragColor = vec4(col * a, a * alpha);
+            float core = smoothstep(0.18, 0.0, d);
+            vec3 col = mix(vC, vec3(1.0), core * 0.4);
+            gl_FragColor = vec4(col * a, a * vA);
+          } else {
+            // Inactive empty grey cell
+            float a = smoothstep(0.5, 0.08, d);
+            gl_FragColor = vec4(vC * a, a * vA);
           }
         }
       `,
@@ -673,6 +684,10 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
       brain,
       scat,
       seed,
+      col,
+      colAttr,
+      active,
+      activeAttr,
       hit,
       hitAttr,
       selected,
@@ -730,7 +745,10 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
       let best = -1;
       let bz = 99;
 
-      for (let i = 0; i < N; i++) {
+      if (nodeData.length === 0) return -1;
+      const countToScan = Math.min(N, nodeData.length);
+
+      for (let i = 0; i < countToScan; i++) {
         if (threeState.fT > 0 && !threeState.hit[i]) continue;
         const v = proj(i, e, t);
         const dx = (v.x * 0.5 + 0.5) * W - cx;
@@ -757,10 +775,10 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
 
       // Hover tooltip
       const hitIdx = pick(e.clientX, e.clientY);
-      if (hitIdx < 0) {
+      if (hitIdx < 0 || !nodeData[hitIdx]) {
         if (tipRef.current) tipRef.current.style.display = "none";
       } else if (tipRef.current) {
-        const c = CLU[CL[hitIdx]];
+        const c = CLU[CL[hitIdx]] || CLU[0];
         tipRef.current.innerHTML = `<i class="w-2.5 h-2.5 rounded-full shrink-0 shadow-[0_0_8px_${c.c}]" style="background:${c.c};margin-top:3px"></i><div class="flex flex-col"><span class="font-bold text-white leading-tight">${nodeData[hitIdx].title}</span><span class="text-[10px] text-zinc-400 font-mono mt-0.5">${c.k} · ${nodeData[hitIdx].code}</span></div>`;
         tipRef.current.style.display = "flex";
         tipRef.current.style.transform = `translate(${Math.min(e.clientX + 16, window.innerWidth - 340)}px, ${e.clientY + 14}px)`;
@@ -948,9 +966,9 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
       }
       s.selectedAttr.needsUpdate = true;
 
-      if (index >= 0) {
-        const clIdx = CL[index];
-        s.markerAuraMat.color.set(CLU[clIdx].c);
+      if (index >= 0 && index < nodeData.length && nodeData[index]) {
+        const clIdx = CL[index] || 0;
+        s.markerAuraMat.color.set(CLU[clIdx]?.c || "#ff7a59");
         s.markerGroup.visible = true;
 
         const P = s.SEARCH ? 1 : s.p;
@@ -964,8 +982,8 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
         if (onSelectMemory) {
           onSelectMemory({
             id: String(nodeData[index].code),
-            agentId: CLU[CL[index]].agentId,
-            agentName: CLU[CL[index]].k,
+            agentId: CLU[CL[index]]?.agentId || "syntax",
+            agentName: CLU[CL[index]]?.k || "SYNTAX",
             query: nodeData[index].prompt,
             resultPreview: nodeData[index].response || nodeData[index].prompt,
             timestamp: Date.now(),
@@ -980,6 +998,34 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
     },
     [nodeData, CL, onSelectMemory, N]
   );
+
+  // Dynamically light up particles as real prompts are created; empty cells remain dim grey!
+  useEffect(() => {
+    const s = threeRef.current;
+    if (!s) return;
+
+    const totalReal = nodeData.length;
+    for (let i = 0; i < N; i++) {
+      if (i < totalReal) {
+        s.active[i] = 1.0;
+        const clIdx = CL[i] !== undefined ? CL[i] : 0;
+        const hex = CLU[clIdx]?.c || "#4ee8ff";
+        const c = new THREE.Color(hex);
+        s.col[i * 3] = c.r;
+        s.col[i * 3 + 1] = c.g;
+        s.col[i * 3 + 2] = c.b;
+      } else {
+        s.active[i] = 0.0;
+        // Inactive empty grey cell
+        s.col[i * 3] = 0.15;
+        s.col[i * 3 + 1] = 0.18;
+        s.col[i * 3 + 2] = 0.22;
+      }
+    }
+
+    s.activeAttr.needsUpdate = true;
+    s.colAttr.needsUpdate = true;
+  }, [nodeData, CL, N]);
 
   // Update Hits when search or cluster changes
   useEffect(() => {
@@ -1087,6 +1133,25 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
     }
   };
 
+  const handlePurgeAllMemoryToZero = async () => {
+    try {
+      await fetch("/api/memories/clear", { method: "POST" });
+    } catch (e) {}
+    try {
+      localStorage.removeItem("syntax_agent_persistent_memory_v1");
+      localStorage.removeItem("jarvis_agent_chats_v2");
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith("syntax_query_logs_v1_") || k.includes("memory") || k.includes("prompts"))) {
+          localStorage.removeItem(k);
+        }
+      }
+    } catch (e) {}
+    setBackendMemories([]);
+    handleReset();
+    window.dispatchEvent(new Event("syntax_query_logs_updated"));
+  };
+
   // Next and Previous navigation for detail drawer
   const handleStepPrompt = (direction: 1 | -1) => {
     if (searchResults.items.length === 0) return;
@@ -1143,10 +1208,10 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
         <div className="flex items-center gap-2.5 flex-wrap pointer-events-auto">
           {/* Main Title Badge */}
           <div className="flex items-center gap-2.5 bg-[#090b14]/90 border border-white/15 rounded-full px-4 py-2 backdrop-blur-xl font-mono text-xs text-[#e9e6e1] shadow-xl">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#ff7a59] shadow-[0_0_14px_#ff7a59]" />
+            <span className={`w-2.5 h-2.5 rounded-full ${nodeData.length === 0 ? "bg-cyan-400 shadow-[0_0_14px_#38bdf8]" : "bg-[#ff7a59] shadow-[0_0_14px_#ff7a59]"}`} />
             <b className="text-white tracking-wide">PapayaOS Memory</b>
             <span className="text-[#8b8f9c] text-xs font-normal">
-              {N.toLocaleString("de-DE")} Prompts
+              {nodeData.length === 0 ? "0 Prompts (Gedächtnis auf 0)" : `${nodeData.length.toLocaleString("de-DE")} Prompts`}
             </span>
             <span className="flex items-center gap-1.5 text-[#8b8f9c] text-[11px]">
               <i className="w-1.5 h-1.5 rounded-full bg-[#22c55e] shadow-[0_0_8px_#22c55e]" />
@@ -1186,16 +1251,18 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
           </label>
 
           {/* Random Prompt Button */}
-          <button
-            type="button"
-            onClick={handleRandomPrompt}
-            className="flex items-center gap-2 bg-[#090b14]/90 hover:bg-white/10 border border-white/15 hover:border-[#ff7a59] rounded-full px-4 py-2 backdrop-blur-xl text-xs font-mono text-[#e9e6e1] transition cursor-pointer shadow-xl"
-          >
-            <Shuffle className="w-3.5 h-3.5 text-[#ffb547]" />
-            <span>Zufälliger Prompt</span>
-          </button>
+          {nodeData.length > 0 && (
+            <button
+              type="button"
+              onClick={handleRandomPrompt}
+              className="flex items-center gap-2 bg-[#090b14]/90 hover:bg-white/10 border border-white/15 hover:border-[#ff7a59] rounded-full px-4 py-2 backdrop-blur-xl text-xs font-mono text-[#e9e6e1] transition cursor-pointer shadow-xl"
+            >
+              <Shuffle className="w-3.5 h-3.5 text-[#ffb547]" />
+              <span>Zufälliger Prompt</span>
+            </button>
+          )}
 
-          {/* Reset Button */}
+          {/* Reset View Button */}
           <button
             type="button"
             onClick={handleReset}
@@ -1203,6 +1270,17 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
           >
             <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
             <span>Zurücksetzen</span>
+          </button>
+
+          {/* Purge All Memories To 0 Button for Testing */}
+          <button
+            type="button"
+            onClick={handlePurgeAllMemoryToZero}
+            title="Löscht alle gespeicherten Prompts restlos und setzt das Gedächtnis auf 0"
+            className="flex items-center gap-1.5 bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 hover:border-red-500 rounded-full px-3.5 py-2 backdrop-blur-xl text-xs font-mono text-red-300 transition cursor-pointer shadow-xl"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-red-400" />
+            <span>Gedächtnis auf 0</span>
           </button>
 
           {/* Zoom In & Out Quick Controls */}
@@ -1253,7 +1331,7 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
             }`}
           >
             <span>ALLE</span>
-            <small className="text-[10px] text-zinc-400">({N.toLocaleString("de-DE")})</small>
+            <small className="text-[10px] text-zinc-400">({nodeData.length.toLocaleString("de-DE")})</small>
           </button>
 
           {CLU.map((c, idx) => {
@@ -1284,6 +1362,32 @@ export const MemoryParticleUniverse: React.FC<MemoryParticleUniverseProps> = ({
           })}
         </div>
       </div>
+
+      {/* 5.5. Clean Empty State Overlay when Memory is 0 */}
+      {nodeData.length === 0 && (
+        <div className="fixed inset-0 flex items-center justify-center z-20 pointer-events-none p-4">
+          <div className="bg-[#090b14]/92 border border-white/15 rounded-2xl p-6 text-center max-w-sm backdrop-blur-2xl shadow-2xl pointer-events-auto">
+            <div className="w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center mx-auto mb-3 text-cyan-400">
+              <Brain className="w-6 h-6 animate-pulse" />
+            </div>
+            <h3 className="text-white font-mono font-bold text-sm uppercase tracking-wider mb-1">
+              Gedächtnis auf 0 (Bereit für Tests)
+            </h3>
+            <p className="text-zinc-400 text-xs font-mono leading-relaxed mb-4">
+              Alle erfundenen Prompts und Testdaten wurden restlos gelöscht. Das neuronale Netzwerk ist vollständig unbeschrieben (0 Knoten).
+            </p>
+            <div className="text-[11px] font-mono text-zinc-400 bg-white/5 border border-white/10 rounded-xl p-3 text-left space-y-1.5">
+              <div className="flex items-center gap-2 text-cyan-300 font-bold">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Echtes Gedächtnis testen:</span>
+              </div>
+              <p className="text-[10px] text-zinc-400">
+                Schreibe eine Nachricht im Chat oder sprich mit deinen Agenten. Jeder echte Dialog erzeugt sofort einen eigenen aktiven Memory-Knoten im 3D Universe.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 6. CLEAN LEFT SEARCH RESULTS SIDEBAR */}
       {(debouncedQuery.trim().length > 0 || activeCluster >= 0) && (
